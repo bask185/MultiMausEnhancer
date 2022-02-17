@@ -10,8 +10,6 @@
 XpressNetMasterClass Xnet ;
 
 uint8   group ;
-uint8   prevStates[6] = { 0, 0, 0, 0, 0, 0 } ;
-int8    currentSpeed = 0 ;
 
 uint8_t lookUpSpeed( uint8_t speed )
 {
@@ -54,7 +52,7 @@ void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )
     group = map( group, 0, 28, 0, 4 ) ;                                         // map 28 speedsteps to 5 regions TEST ME
 }
 
-void setOutput( uint8_t Address, uint8_t _functions )
+void setPoint( uint8_t Address, uint8_t _functions )
 {
     static uint16 functions ;
 
@@ -65,29 +63,28 @@ void setOutput( uint8_t Address, uint8_t _functions )
     if( Address != 1) return ;                                                  // only loco adress 1 is used
 
 
-    for( int bitMask = 0b0001 ; bitMask <= 0b100 ; bitMask <<= 1 )
-    {
-        if( (functions & bitMask) != (prevStates[ Address+indexShift ] & bitMask) )        // check all 4 bits for F1 - F4, if atleast 1 bit has changed
-        {
-            prevStates[ Address+indexShift ] = functions & 0x0F ;
+    // for( int bitMask = 0b0001 ; bitMask <= 0b100 ; bitMask <<= 1 )
+    // {
+    //     if( (functions & bitMask) != (prevStates[ Address ] & bitMask) )        // check all 4 bits for F1 - F4, if atleast 1 bit has changed
+    //     {
+    //         prevStates[ Address ] = functions & 0x0F ;
 
-            uint8_t pointNumber = number + ((Address - 1) * 10) ;
-            uint8_t state ;
+    //         uint8_t pointNumber = ((Address - 1) * 10) ;
+    //         uint8_t state ;
 
-            if( functions & bitMask ) state = 1 ;    // on
-            else                      state = 0 ;    // off        
+    //         if( functions & bitMask ) state = 1 ;    // on
+    //         else                      state = 0 ;    // off        
 
-            /*
+    //         /*
             
-            Xnet.SetTrntPos( pointNumber, state, 1 ) ;
-            delay(20) ;                                 // needed?
-            Xnet.SetTrntPos( pointNumber, state, 0 ) ;  // needed?
-            */
-            return ;
-        }
+    //         Xnet.SetTrntPos( pointNumber, state, 1 ) ;
+    //         delay(20) ;                                 // needed?
+    //         Xnet.SetTrntPos( pointNumber, state, 0 ) ;  // needed?
+    //         */
+    //         return ;
+    //     }
 
-        number ++ ;
-    }
+    // }
 }
 
 
