@@ -49,49 +49,51 @@ uint8_t lookUpSpeed( uint8_t speed )
 void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )                   
 {
     group = lookUpSpeed( Speed & 0b00011111 ) ;
-    group = map( group, 0, 28, 0, 4 ) ;                                         // map 28 speedsteps to 5 regions TEST ME
+    if( Speed & 0x80 ) group = -group ;
+    group = map( group, -28, 28, 0, 4 ) ;                                         // map 28 speedsteps to 5 regions TEST ME
 }
 
 void setPoint( uint8_t Address, uint8_t _functions )
 {
-    static uint16 functions ;
+    static uint8 group[3] ;
+    static uint16 prevFunctions ;
+    uint16 functions ;
+    uint8 number ;
 
-    if(      _functions & F9_F10 ) { }
-    else if( _functions & F5_F8  ) { }
-    else /*               F1_F4 */ { }
+    if(      _functions & F9_F10 ) { group[2] = _functions & 0x03 ; }
+    else if( _functions & F5_F8  ) { group[1] = _functions & 0x0F ; }
+    else /*               F1_F4 */ { group[0] = _functions & 0x0F ; }
+
+    functions = (group[2] << 8 ) | (group[1] << 4 ) | group[0] ;
 
     if( Address != 1) return ;                                                  // only loco adress 1 is used
 
+    for( int bitMask = 0b1 ; bitMask <= 0b1000000000 ; bitMask <<= 1 )          // check which of the 10 bits has changed
+    {
+        number ++ ;                                                             // count from 1-10
+        if( (functions & bitMask) != (prevFunctions & bitMask) )                // check all 4 bits for F1 - F4, if atleast 1 bit has changed
+        {
+            prevFunctions = functions ;
+            uint8_t state ;
 
-    // for( int bitMask = 0b0001 ; bitMask <= 0b100 ; bitMask <<= 1 )
-    // {
-    //     if( (functions & bitMask) != (prevStates[ Address ] & bitMask) )        // check all 4 bits for F1 - F4, if atleast 1 bit has changed
-    //     {
-    //         prevStates[ Address ] = functions & 0x0F ;
+            if( functions & bitMask ) state = 1 ;                               // curved
+            else                      state = 0 ;                               // straight        
 
-    //         uint8_t pointNumber = ((Address - 1) * 10) ;
-    //         uint8_t state ;
-
-    //         if( functions & bitMask ) state = 1 ;    // on
-    //         else                      state = 0 ;    // off        
-
-    //         /*
+            uint8 pointNumber = number * group ;                                // 5 groups
             
-    //         Xnet.SetTrntPos( pointNumber, state, 1 ) ;
-    //         delay(20) ;                                 // needed?
-    //         Xnet.SetTrntPos( pointNumber, state, 0 ) ;  // needed?
-    //         */
-    //         return ;
-    //     }
+            Xnet.SetTrntPos( pointNumber, state, 1 ) ;
+            delay(20) ;
+            Xnet.SetTrntPos( pointNumber, state, 0 ) ;
+            
+            return ;
+        }
 
-    // }
+    }
 }
-
 
 void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { setPoint( Address, Func1 | F1_F4  ) ; } // Gruppe1 0 0 0 F0    F4  F3  F2  F1
 void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { setPoint( Address, Func2 | F5_F8  ) ; } // Gruppe2     0000    F8  F7  F6  F5
 void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { setPoint( Address, Func3 | F9_F10 ) ; } // Gruppe3     0000   F12 F11 F10  F9
-
 
 void setup()
 {
