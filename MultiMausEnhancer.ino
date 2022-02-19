@@ -7,87 +7,79 @@
 #define  F5_F8  0x40
 #define F9_F10  0x80
 
+#ifndef debug
 XpressNetMasterClass Xnet ;
+#endif
 
-uint8   group ;
+int16   knob ;
 
-uint8_t lookUpSpeed( uint8_t speed )
+
+void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
-    switch( speed )
-    {
-    case 0b00000 : return  0 ; //  0
-    case 0b00010 : return  1 ; //  2
-    case 0b10010 : return  2 ; // 18
-    case 0b00011 : return  3 ; //  3
-    case 0b10011 : return  4 ; // 19
-    case 0b00100 : return  5 ; //  4
-    case 0b10100 : return  6 ; // 20
-    case 0b00101 : return  7 ; //  5
-    case 0b10101 : return  8 ; // 21
-    case 0b00110 : return  9 ; //  6
-    case 0b10110 : return 10 ; // 22 
-    case 0b00111 : return 11 ; //  7
-    case 0b10111 : return 12 ; // 23
-    case 0b01000 : return 13 ; //  8
-    case 0b11000 : return 14 ; // 24
-    case 0b01001 : return 15 ; //  9
-    case 0b11001 : return 16 ; // 25
-    case 0b01010 : return 17 ; // 10
-    case 0b11010 : return 18 ; // 26
-    case 0b01011 : return 19 ; // 11
-    case 0b11011 : return 20 ; // 27
-    case 0b01100 : return 21 ; // 12
-    case 0b11100 : return 22 ; // 28
-    case 0b01101 : return 23 ; // 13
-    case 0b11101 : return 24 ; // 29
-    case 0b01110 : return 25 ; // 14
-    case 0b11110 : return 26 ; // 30
-    case 0b01111 : return 27 ; // 15
-    case 0b11111 : return 28 ; // 31
+    static uint8 state = 0 , prevKnob;
+    int8 speed = Speed ;
+
+    // if(      speed == 0 ) speed = 0 ;   // step 0
+    // else if( speed == 1 ) speed = 0 ;   // E stop
+    // else                  speed -- ;
+
+    //if( speed & 0x80 ) speed = -speed ;
+    
+    if(         speed <  -120               ) knob = 0 ;
+    else if(    speed >= -120 && speed <-10 ) knob = 1 ;
+    else if(    speed >   -10 && speed < 10 ) knob = 3 ;
+    else if(    speed  <= 120 && speed > 10 ) knob = 3 ;
+    else if(    speed   > 120               ) knob = 4 ;
+
+    if( prevKnob != knob )
+    {   prevKnob  = knob ;
+
+        Xnet.SetTrntPos( 2, state, 1 ) ;
+        delay(20) ;
+        Xnet.SetTrntPos( 2, state, 0 ) ;
+        state ^= 1 ;
     }
 }
-void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )                   
-{
-    group = lookUpSpeed( Speed & 0b00011111 ) ;
-    if( Speed & 0x80 ) group = -group ;
-    group = map( group, -28, 28, 0, 4 ) ;                                         // map 28 speedsteps to 5 regions TEST ME
-}
 
-void setPoint( uint8_t Address, uint8_t _functions )
+void setPoint( uint8_t Address, uint8_t functions )
 {
-    static uint8 group[3] ;
-    static uint16 prevFunctions ;
-    uint16 functions ;
+    if( Address != 1) return ;   
+
+    static uint16 prevFunctions[3][5] ;
     uint8 number ;
+    uint8 index ;
 
-    if(      _functions & F9_F10 ) { group[2] = _functions & 0x03 ; }
-    else if( _functions & F5_F8  ) { group[1] = _functions & 0x0F ; }
-    else /*               F1_F4 */ { group[0] = _functions & 0x0F ; }
-
-    functions = (group[2] << 8 ) | (group[1] << 4 ) | group[0] ;
-
-    if( Address != 1) return ;                                                  // only loco adress 1 is used
-
-    for( int bitMask = 0b1 ; bitMask <= 0b1000000000 ; bitMask <<= 1 )          // check which of the 10 bits has changed
+    switch( functions & 0xC0 )
     {
-        number ++ ;                                                             // count from 1-10
-        if( (functions & bitMask) != (prevFunctions & bitMask) )                // check all 4 bits for F1 - F4, if atleast 1 bit has changed
+    case  F1_F4 : index = 0 ; functions &= 0x0F ; number = 0 ;/* Serial.println( "F1_F4" ) ;*/ break ;
+    case  F5_F8 : index = 1 ; functions &= 0x0F ; number = 4 ;/* Serial.println( "F5_F8" ) ;*/ break ;
+    case F9_F10 : index = 2 ; functions &= 0x03 ; number = 8 ;/* Serial.println("F9_F10" ) ;*/ break ;
+    }
+
+    for( int bitMask = 0x01 ; bitMask < 0x10 ; bitMask <<= 1 )                        // check which of the 4 bits has changed
+    {       
+        number ++ ;  
+
+        if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
         {
-            prevFunctions = functions ;
             uint8_t state ;
 
-            if( functions & bitMask ) state = 1 ;                               // curved
-            else                      state = 0 ;                               // straight        
+            if( functions & bitMask ) { state = 1 ; prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
+            else                      { state = 0 ; prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
 
-            uint8 pointNumber = number * group ;                                // 5 groups
+            uint8 pointNumber = number += ( knob * 10 ) ;                                // 5 groups
             
-            Xnet.SetTrntPos( pointNumber, state, 1 ) ;
+            #ifndef debug
+            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;
             delay(20) ;
-            Xnet.SetTrntPos( pointNumber, state, 0 ) ;
+            Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
+
+            #else
+            printNumber_( "point: ", pointNumber ) ; Serial.println( state ) ;
+            #endif
             
             return ;
         }
-
     }
 }
 
@@ -97,10 +89,41 @@ void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { setPoint( Address,
 
 void setup()
 {
+    #ifndef debug
     Xnet.setup( Loco28, RS485DIR ) ;
+    #else
+    Serial.begin( 115200 ) ;
+    #endif
 }
 
 void loop()
 {
+
+    #ifndef debug
     Xnet.update() ;
+
+    #else
+    for( knob = 0 ; knob <= 4 ; knob ++ )
+    {
+
+        setPoint( 1, 0b0001 | F1_F4 ) ; 
+        setPoint( 1, 0b0011 | F1_F4 ) ;
+        setPoint( 1, 0b0111 | F1_F4 ) ;
+        setPoint( 1, 0b1111 | F1_F4 ) ;
+
+        setPoint( 1, 0b0001 | F5_F8 ) ;
+        setPoint( 1, 0b0011 | F5_F8 ) ;
+        setPoint( 1, 0b0111 | F5_F8 ) ;
+        setPoint( 1, 0b1111 | F5_F8 ) ;
+
+        setPoint( 1, 0b0001 | F9_F10 ) ;
+        setPoint( 1, 0b0011 | F9_F10 ) ;
+
+        Serial.println() ;
+
+    }
+    delay(10000000) ;
+
+    
+    #endif
 }

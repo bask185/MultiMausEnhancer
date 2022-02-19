@@ -31,6 +31,8 @@
 	- fix range CV# Adr to uint16_t
 */
 
+// #define debug
+
 // ensure this library description is only included once
 #ifndef XpressNetMaster_h
 #define XpressNetMaster_h
