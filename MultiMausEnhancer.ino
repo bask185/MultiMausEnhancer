@@ -1,6 +1,7 @@
 #include "src/version.h"
 #include "src/macros.h"
 #include "src/XpressNetMaster.h"
+#include <EEPROM.h>
 
 #define RS485DIR 2
 #define  F1_F4  0x00
@@ -11,34 +12,36 @@
 XpressNetMasterClass Xnet ;
 #endif
 
-int16   knob ;
+uint8   knob ;
+volatile uint16 eeAddress  = 0 ;
 
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
-    static uint8 state = 0 , prevKnob;
-    int8 speed = Speed ;
+    static uint8 state = 0 , prevKnob = 0xFF ;
+    int8_t speed ;
 
-    // if(      speed == 0 ) speed = 0 ;   // step 0
-    // else if( speed == 1 ) speed = 0 ;   // E stop
-    // else                  speed -- ;
+    speed = Speed & 0x7F ;
 
-    //if( speed & 0x80 ) speed = -speed ;
-    
-    if(         speed <  -120               ) knob = 0 ;
-    else if(    speed >= -120 && speed <-10 ) knob = 1 ;
-    else if(    speed >   -10 && speed < 10 ) knob = 3 ;
-    else if(    speed  <= 120 && speed > 10 ) knob = 3 ;
-    else if(    speed   > 120               ) knob = 4 ;
+    if( speed > 0 ) speed -- ;
+    if( Speed & 0x80 ) speed = -speed ;
+   
+    if(         speed <  -100               ) knob = 4 ;
+    else if(    speed >= -100 && speed <-20 ) knob = 3 ;
+    else if(    speed >   -20 && speed < 20 ) knob = 2 ;
+    else if(    speed <=  100 && speed > 20 ) knob = 1 ;
+    else if(    speed >   100               ) knob = 0 ;
 
-    if( prevKnob != knob )
-    {   prevKnob  = knob ;
+    // if( prevKnob != knob )
+    // {   prevKnob  = knob ;
 
-        Xnet.SetTrntPos( 2, state, 1 ) ;
-        delay(20) ;
-        Xnet.SetTrntPos( 2, state, 0 ) ;
-        state ^= 1 ;
-    }
+    //     EEPROM.write( eeAddress, knob ) ;
+    //     eeAddress ++ ;
+    //     // Xnet.SetTrntPos( 2, state, 1 ) ;
+    //     // delay(20) ;
+    //     // Xnet.SetTrntPos( 2, state, 0 ) ;
+    //     // state ^= 1 ;
+    // }
 }
 
 void setPoint( uint8_t Address, uint8_t functions )
@@ -64,8 +67,8 @@ void setPoint( uint8_t Address, uint8_t functions )
         {
             uint8_t state ;
 
-            if( functions & bitMask ) { state = 1 ; prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
-            else                      { state = 0 ; prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
+            if( functions & bitMask ) { state = 0 ; prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
+            else                      { state = 1 ; prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
 
             uint8 pointNumber = number += ( knob * 10 ) ;                                // 5 groups
             
@@ -83,8 +86,8 @@ void setPoint( uint8_t Address, uint8_t functions )
     }
 }
 
-void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { setPoint( Address, Func1 | F1_F4  ) ; } // Gruppe1 0 0 0 F0    F4  F3  F2  F1
-void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { setPoint( Address, Func2 | F5_F8  ) ; } // Gruppe2     0000    F8  F7  F6  F5
+void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { setPoint( Address, Func1 |  F1_F4 ) ; } // Gruppe1 0 0 0 F0    F4  F3  F2  F1
+void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { setPoint( Address, Func2 |  F5_F8 ) ; } // Gruppe2     0000    F8  F7  F6  F5
 void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { setPoint( Address, Func3 | F9_F10 ) ; } // Gruppe3     0000   F12 F11 F10  F9
 
 void setup()
@@ -93,6 +96,13 @@ void setup()
     Xnet.setup( Loco28, RS485DIR ) ;
     #else
     Serial.begin( 115200 ) ;
+    for( int i = 0 ; i < 1024 ; i ++ )
+    {
+        int8 b = EEPROM.read(i) ;
+        Serial.print( b ) ; Serial.print("   "); Serial.print( b, HEX ) ; Serial.print("   "); Serial.println( b, BIN ) ;
+        
+    }
+    while(1);
     #endif
 }
 
