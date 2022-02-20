@@ -15,6 +15,8 @@ XpressNetMasterClass Xnet ;
 uint8   knob ;
 volatile uint16 eeAddress  = 0 ;
 
+unsigned long long prevState ; // 64 bits
+
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
@@ -65,17 +67,21 @@ void setPoint( uint8_t Address, uint8_t functions )
 
         if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
         {
-            uint8_t state ;
-
-            if( functions & bitMask ) { state = 0 ; prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
-            else                      { state = 1 ; prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
+            if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
+            else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
 
             uint8 pointNumber = number += ( knob * 10 ) ;                                // 5 groups
-            
+
+            bool state = (prevState >> pointNumber) & 1 ;                   // get last state
+            state ^= 1 ;                                                    // toggle state
+
             #ifndef debug
-            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;
+            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                  // set new state
             delay(20) ;
             Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
+
+            if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;    // store new state
+            else             prevState |=  ( 1 << pointNumber ) ; 
 
             #else
             printNumber_( "point: ", pointNumber ) ; Serial.println( state ) ;
