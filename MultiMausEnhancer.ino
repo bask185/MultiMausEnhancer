@@ -124,7 +124,7 @@ void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) // F0  F4  F3  F2  F
     }
 }
 
-void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func1 ) // F8  F7  F6  F5
+void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) // F8  F7  F6  F5
 {
     if( Address != 1) return ;
 
@@ -134,9 +134,9 @@ void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func1 ) // F8  F7  F6  F5
     for( uint8 bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )
     {
         number ++ ;
-        if( (Func1 & bitMask) != (prevState & bitMask ) )
+        if( (Func2 & bitMask) != (prevState & bitMask ) )
         {
-            if( Func1 & bitMask ) { prevState |=  bitMask ; }
+            if( Func2 & bitMask ) { prevState |=  bitMask ; }
             else                  { prevState &= ~bitMask ; }
 
             setFunc( number ) ;
@@ -144,7 +144,7 @@ void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func1 ) // F8  F7  F6  F5
     }
 }
 
-void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func1 ) // F12 F11 F10  F9
+void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) // F12 F11 F10  F9
 {
     if( Address != 1) return ;
 
@@ -154,9 +154,9 @@ void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func1 ) // F12 F11 F10  F9
     for( uint8 bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )
     {
         number ++ ;
-        if( (Func1 & bitMask) != (prevState & bitMask ) )
+        if( (Func3 & bitMask) != (prevState & bitMask ) )
         {
-            if( Func1 & bitMask ) { prevState |=  bitMask ; }
+            if( Func3 & bitMask ) { prevState |=  bitMask ; }
             else                  { prevState &= ~bitMask ; }
 
             setFunc( number ) ;
@@ -174,9 +174,9 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 )  //F20 F19 F18 F17 F
     for( uint16 bitMask = 0x01 ; bitMask > 0x100 ; bitMask <<= 1 )
     {
         number ++ ;
-        if( (Func1 & bitMask) != (prevState & bitMask ) )
+        if( (Func4 & bitMask) != (prevState & bitMask ) )
         {
-            if( Func1 & bitMask ) { prevState |=  bitMask ; }
+            if( Func4 & bitMask ) { prevState |=  bitMask ; }
             else                  { prevState &= ~bitMask ; }
 
             setFunc( number ) ;
