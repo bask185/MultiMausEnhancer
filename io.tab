@@ -1,1 +1,7 @@
 1	pinNumber	INPUT
+
+MCP1
+3	someName2	OUTPUT
+
+MCP2
+6	someName	INPUT_PULLUP
