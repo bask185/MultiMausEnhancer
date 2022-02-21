@@ -3,19 +3,42 @@
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h>
 
+
+
+
 #define RS485DIR 2
 #define  F1_F4  0x00
 #define  F5_F8  0x40
 #define F9_F10  0x80
 
+#define BASE_ADDRESS 500 
+
 #ifndef debug
 XpressNetMasterClass Xnet ;
 #endif
+
+const int nPointsPerStreet = 20 ;
 
 uint8   knob ;
 volatile uint16 eeAddress  = 0 ;
 
 unsigned long long prevState ; // 64 bits
+
+uint16 points[ nPointsPerStreet ] ;
+uint
+
+
+void setStreet( uint16 streetNumber )
+{
+    EEPROM.
+}
+
+void notifyXNetTrnt( uint16_t Address, uint8_t data )
+{
+    if( Address <= BASE_ADDRESS || Address > (BASE_ADDRESS + 20) ) return ;
+
+    setStreet( Address - BASE_ADDRESS ) 
+}
 
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
@@ -28,22 +51,11 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     if( speed > 0 ) speed -- ;
     if( Speed & 0x80 ) speed = -speed ;
    
-    if(         speed <  -100               ) knob = 4 ;
-    else if(    speed >= -100 && speed <-20 ) knob = 3 ;
-    else if(    speed >   -20 && speed < 20 ) knob = 2 ;
-    else if(    speed <=  100 && speed > 20 ) knob = 1 ;
-    else if(    speed >   100               ) knob = 0 ;
-
-    // if( prevKnob != knob )
-    // {   prevKnob  = knob ;
-
-    //     EEPROM.write( eeAddress, knob ) ;
-    //     eeAddress ++ ;
-    //     // Xnet.SetTrntPos( 2, state, 1 ) ;
-    //     // delay(20) ;
-    //     // Xnet.SetTrntPos( 2, state, 0 ) ;
-    //     // state ^= 1 ;
-    // }
+    if(         speed <  -100                ) knob = 4 ;
+    else if(    speed >= -100 && speed < -20 ) knob = 3 ;
+    else if(    speed >   -20 && speed <  20 ) knob = 2 ;
+    else if(    speed <=  100 && speed >  20 ) knob = 1 ;
+    else if(    speed >   100                ) knob = 0 ;
 }
 
 void setPoint( uint8_t Address, uint8_t functions )
@@ -67,20 +79,20 @@ void setPoint( uint8_t Address, uint8_t functions )
 
         if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
         {
-            if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }                             // curved
-            else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }                            // straight        
+            if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }
+            else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }      
 
-            uint8 pointNumber = number += ( knob * 10 ) ;                                // 5 groups
+            uint8 pointNumber = number += ( knob * 10 ) ;                       // 5 groups
 
-            bool state = (prevState >> pointNumber) & 1 ;                   // get last state
-            state ^= 1 ;                                                    // toggle state
+            bool state = (prevState >> pointNumber) & 1 ;                       // get last state
+            state ^= 1 ;                                                        // toggle state
 
             #ifndef debug
-            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                  // set new state
+            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
             delay(20) ;
             Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
 
-            if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;    // store new state
+            if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;               // store new state
             else             prevState |=  ( 1 << pointNumber ) ; 
 
             #else
