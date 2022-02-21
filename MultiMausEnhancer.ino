@@ -24,15 +24,21 @@ volatile uint16 eeAddress  = 0 ;
 
 unsigned long long prevState ; // 64 bits
 
-uint16 points[ nPointsPerStreet ] ;
-uint
+uint16  points[ nPointsPerStreet ] ;
+uint8   pointIndex ;
 
 
-void setStreet( uint16 streetNumber )
+void settingPoints()
 {
-    EEPROM.
+    if( pointIndex) > nPointsPerStreet
 }
+void setStreet( uint8 streetNumber )
+{
+    uint16 eeAddress = streetNumber * nPointsPerStreet * 2 ;                    // calculate address
 
+    pointIndex = 0 ;                                                            // reset this index for setting a street
+    EEPROM.get( eeAddress, points ) ;                                           // fetch array from EEPROM
+}
 void notifyXNetTrnt( uint16_t Address, uint8_t data )
 {
     if( Address <= BASE_ADDRESS || Address > (BASE_ADDRESS + 20) ) return ;
