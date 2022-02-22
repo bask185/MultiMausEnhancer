@@ -3,16 +3,15 @@
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h>
 
-
-
-
 #define RS485DIR 2
-#define  F1_F4  0x00
-#define  F5_F8  0x40
-#define F9_F10  0x80
-#define CURVED 0x8000
-#define STRAIGHT 0x0000
 
+#define   F0_F4  0x00
+#define   F5_F8  0x01
+#define  F9_F12  0x02
+#define F13_F20  0x03
+
+#define CURVED   0x0000
+#define STRAIGHT 0x8000
 
 #define BASE_ADDRESS 100 
 #define MAX_ADDRESS 1024
@@ -26,7 +25,7 @@ const int nPointsPerStreet = 10 ;
 uint8   knob ;
 volatile uint16 eeAddress  = 0 ;
 
-unsigned long long prevState ; // 64 bits
+volatile unsigned long long oldState ; // 64 bits
 
 volatile uint16  points[ nPointsPerStreet ] ;
 volatile uint8   pointIndex = 100 ;      // something high
@@ -88,169 +87,131 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed >   100                ) knob = 0 ;
 }
 
-void setPoint( uint8_t Address, uint8_t functions )
-{
-    if( Address != 1) return ;   
+// void setPoint( uint8_t Address, uint8_t functions ) // OBSOLETE
+// {
+//     if( Address != 1) return ;   
 
-    static uint16 prevFunctions[3][5] ;
-    uint8 number ;
-    uint8 index ;
+//     static uint16 prevFunctions[3][5] ;
+//     uint8 number ;
+//     uint8 index ;
 
-    switch( functions & 0xC0 )
-    {
-    case  F1_F4 : index = 0 ; functions &= 0x0F ; number = 0 ;/* Serial.println( "F1_F4" ) ;*/ break ;
-    case  F5_F8 : index = 1 ; functions &= 0x0F ; number = 4 ;/* Serial.println( "F5_F8" ) ;*/ break ;
-    case F9_F10 : index = 2 ; functions &= 0x03 ; number = 8 ;/* Serial.println("F9_F10" ) ;*/ break ;
-    }
+//     switch( functions & 0xC0 )
+//     {
+//     case  F0_F4 : index = 0 ; functions &= 0x0F ; number = 0 ;/* Serial.println( "F0_F4" ) ;*/ break ;
+//     case  F5_F8 : index = 1 ; functions &= 0x0F ; number = 4 ;/* Serial.println( "F5_F8" ) ;*/ break ;
+//     case F9_F12 : index = 2 ; functions &= 0x03 ; number = 8 ;/* Serial.println("F9_F10" ) ;*/ break ;
+//     }
 
-    for( int bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )                        // check which of the 4 bits has changed
-    {       
-        number ++ ;  
+//     for( int bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )                        // check which of the 4 bits has changed
+//     {       
+//         number ++ ;  
 
-        if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
-        {
-            if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }
-            else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }      
+//         if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
+//         {
+//             if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }
+//             else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }      
 
-            uint8 pointNumber = number += ( knob * 10 ) ;                       // 5 groups
+//             uint8 pointNumber = number += ( knob * 10 ) ;                       // 5 groups
 
-            bool state = (prevState >> pointNumber) & 1 ;                       // get last state
-            state ^= 1 ;                                                        // toggle state
+//             bool state = (prevState >> pointNumber) & 1 ;                       // get last state
+//             state ^= 1 ;                                                        // toggle state
 
-            #ifndef debug
-            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
-            delay(20) ;
-            Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
+//             #ifndef debug
+//             Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
+//             delay(20) ;
+//             Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
 
-            if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;               // store new state
-            else             prevState |=  ( 1 << pointNumber ) ; 
+//             if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;               // store new state
+//             else             prevState |=  ( 1 << pointNumber ) ; 
 
-            #else
-            printNumber_( "point: ", pointNumber ) ; Serial.println( state ) ;
-            #endif
+//             #else
+//             printNumber_( "point: ", pointNumber ) ; Serial.println( state ) ;
+//             #endif
             
-            return ;
-        }
-    }
-}
-
-// void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { setPoint( Address, Func1 |  F1_F4 ) ; } // Gruppe1        000 F0    F4  F3  F2  F1
-// void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { setPoint( Address, Func2 |  F5_F8 ) ; } // Gruppe2          0000    F8  F7  F6  F5
-// void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { setPoint( Address, Func3 | F9_F10 ) ; } // Gruppe3          0000   F12 F11 F10  F9
-// void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 )                                           // Gruppe4 F20 F19 F18 F17 F16 F15 F14 F13
+//             return ;
+//         }
+//     }
+// }
 
 void setFunc( uint8 val )
 {
     EEPROM.write( eeAddress++, val ) ;
 }
 
-void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) // F0  F4  F3  F2  F1
+
+void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
 {
     if( Address != 1) return ;
 
-    static uint8 prevState ;
-    uint8 number = 0 ;
+    volatile static uint8 prevState[4];
+    volatile uint8  fKey ;
+    volatile uint16 maskMax ;
 
-    for( uint8 bitMask = 0x01 ; bitMask > 0x20 ; bitMask <<= 1 )
+    switch( bank )
     {
-        number ++ ;
-        if( (Func1 & bitMask) != (prevState & bitMask ) )
+    case   F0_F4 : fKey =  0 ; maskMax =  0x20 ; break ;
+    case   F5_F8 : fKey =  4 ; maskMax =  0x10 ; break ;
+    case  F9_F12 : fKey =  8 ; maskMax =  0x10 ; break ;
+    case F13_F20 : fKey = 12 ; maskMax = 0x100 ; break ;
+    }
+
+    for( uint8 bitMask = 0x01 ; bitMask < maskMax ; bitMask <<= 1 )
+    {
+        fKey ++ ;
+        if( (func & bitMask) != (prevState[bank] & bitMask ) )
         {
-            if( Func1 & bitMask ) { prevState |=  bitMask ; }
-            else                  { prevState &= ~bitMask ; }
+            if( func & bitMask ) { prevState[bank] |=  bitMask ; }
+            else                 { prevState[bank] &= ~bitMask ; }
 
-            if( number == 5) number = 0 ;   // F0 is on the 5th bit
+            if( fKey == 5 && bank == F0_F4 ) fKey = 0 ;                         // F0 is on the 5th bit
 
-            setFunc( number ) ;
+            oldState ^= (1 << fKey );                                           // toggle previous state
+            bool state = oldState >> fKey ;                                     // get state 
+
+            uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
+
+            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
+            delay(20) ;
+            Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
+            
+            //setFunc( fKey ) ;                                                 // VERIVIED
+            //setFunc( state ) ;                                                // VERIVIED
+            return ;
         }
     }
 }
 
-void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) // F8  F7  F6  F5
-{
-    if( Address != 1) return ;
+void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { functionPressed( Address, Func1,   F0_F4 ) ; } //            F0    F4  F3  F2  F1
+void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { functionPressed( Address, Func2,   F5_F8 ) ; } //                  F8  F7  F6  F5
+void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( Address, Func3,  F9_F12 ) ; } //                 F12 F11 F10  F9
+void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
 
-    static uint8 prevState ;
-    uint8 number = 4 ;
-
-    for( uint8 bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )
-    {
-        number ++ ;
-        if( (Func2 & bitMask) != (prevState & bitMask ) )
-        {
-            if( Func2 & bitMask ) { prevState |=  bitMask ; }
-            else                  { prevState &= ~bitMask ; }
-
-            setFunc( number ) ;
-        }
-    }
-}
-
-void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) // F12 F11 F10  F9
-{
-    if( Address != 1) return ;
-
-    static uint8 prevState ;
-    uint8 number = 8 ;
-
-    for( uint8 bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )
-    {
-        number ++ ;
-        if( (Func3 & bitMask) != (prevState & bitMask ) )
-        {
-            if( Func3 & bitMask ) { prevState |=  bitMask ; }
-            else                  { prevState &= ~bitMask ; }
-
-            setFunc( number ) ;
-        }
-    }
-}
-
-void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 )  //F20 F19 F18 F17 F16 F15 F14 F13
-{
-    if( Address != 1) return ;
-
-    static uint8 prevState ;
-    uint8 number = 12 ;
-
-    for( uint16 bitMask = 0x01 ; bitMask > 0x100 ; bitMask <<= 1 )
-    {
-        number ++ ;
-        if( (Func4 & bitMask) != (prevState & bitMask ) )
-        {
-            if( Func4 & bitMask ) { prevState |=  bitMask ; }
-            else                  { prevState &= ~bitMask ; }
-
-            setFunc( number ) ;
-        }
-    }
-}
 
 
 void setup()
 {
     uint16_t eeAddress = 0 ;
-    EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 4   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 5   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 6   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 7   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 8   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 9   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 10  ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ; this seems to work well
+    // EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 4   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 5   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 6   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 7   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 8   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 9   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 10  ) ; eeAddress++ ;
 
-    EEPROM.put( eeAddress++, STRAIGHT | 1   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 2   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 3   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 4   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, STRAIGHT | 5   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 6   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 7   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 8   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 9   ) ; eeAddress++ ;
-    EEPROM.put( eeAddress++, CURVED   | 10  ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 1   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 2   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 3   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 4   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 5   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 6   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 7   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 8   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 9   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 10  ) ; eeAddress++ ;
 
     // points[ 0 ] = CURVED   | 1 ;
     // points[ 1 ] = CURVED   | 2 ;
@@ -271,12 +232,15 @@ void setup()
     Xnet.setup( Loco28, RS485DIR ) ;
     #else
     Serial.begin( 115200 ) ;
-    for( uint16 eeAddress = 0 ; eeAddress < 100 ; eeAddress += 2 )
+    //uint16 eeAddress = 0 ;
+    for( uint16 i = 0 ; i < 100 ; i ++ )
     {
-        uint16_t b ;
-        
-        EEPROM.get( eeAddress, b ) ;
-        Serial.print( b ) ; Serial.print("   "); Serial.print( b, HEX ) ; Serial.print("   "); Serial.println( b, BIN ) ;
+      
+        uint8 a = EEPROM.read( eeAddress ++ ) ;
+        uint8 b = EEPROM.read( eeAddress ++ ) ;
+        // uint8 c = EEPROM.read( eeAddress ++ ) ;
+        // uint8 d = EEPROM.read( eeAddress ++ ) ;
+        Serial.print( a ) ; Serial.print("   "); Serial.println( b ) ;// Serial.print("   "); Serial.print( c ) ;  Serial.print("   "); Serial.println( d ) ;
         
     }
     while(1);
@@ -288,30 +252,6 @@ void loop()
 
     #ifndef debug
     Xnet.update() ;
-    settingPoints() ;
-
-    #else
-    for( knob = 0 ; knob <= 4 ; knob ++ )
-    {
-
-        setPoint( 1, 0b0001 | F1_F4 ) ; 
-        setPoint( 1, 0b0011 | F1_F4 ) ;
-        setPoint( 1, 0b0111 | F1_F4 ) ;
-        setPoint( 1, 0b1111 | F1_F4 ) ;
-
-        setPoint( 1, 0b0001 | F5_F8 ) ;
-        setPoint( 1, 0b0011 | F5_F8 ) ;
-        setPoint( 1, 0b0111 | F5_F8 ) ;
-        setPoint( 1, 0b1111 | F5_F8 ) ;
-
-        setPoint( 1, 0b0001 | F9_F10 ) ;
-        setPoint( 1, 0b0011 | F9_F10 ) ;
-
-        Serial.println() ;
-
-    }
-    delay(10000000) ;
-
-    
+    settingPoints() ;    
     #endif
 }
