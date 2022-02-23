@@ -1,7 +1,8 @@
 #include "src/version.h"
 #include "src/macros.h"
 #include "src/XpressNetMaster.h"
-#include <EEPROM.h>
+#include <EEPROM.h> // needs to be removed in the future, preferebly
+#include "eeprom.h"
 
 #define RS485DIR 2
 
@@ -20,9 +21,12 @@
 XpressNetMasterClass Xnet ;
 #endif
 
-const int nPointsPerStreet = 10 ;
 
 uint8   knob ;
+volatile uint8   recording ;
+volatile uint8   gettingStreetIndex ;
+volatile uint8   streetIndex ;
+
 volatile uint16 eeAddress  = 0 ;
 
 volatile unsigned long long oldState ; // 64 bits
@@ -63,10 +67,43 @@ void setStreet( uint8 streetNumber )
 }
 void notifyXNetTrnt( uint16_t Address, uint8_t data )                               // setting point 101, gives us 100 back
 {
-    pinMode(13, INPUT_PULLUP );
-    if( Address < BASE_ADDRESS || Address >= (BASE_ADDRESS + 20) ) return ;
+    if( Address == (BASE_ADDRESS - 1) )
+    {
+        bool state = data & 1 ;
+        if( state == 1 ) { recording =  true ; gettingStreetIndex = true ; }
+        else             { recording = false ; }
+        return ;
+    }
 
-    setStreet( Address - BASE_ADDRESS ) ;
+    if( recording )
+    {
+        if( gettingStreetIndex == true )
+        {
+            if( Address < BASE_ADDRESS || Address >= (BASE_ADDRESS + nStreets ) ) return ; // check for valid address
+           
+            streetIndex = Address - BASE_ADDRESS ;
+            gettingStreetIndex = false ;
+            clear( streetIndex ) ;
+            /* TODO
+            * whipe part for EEPROM for new point street
+            */
+        }
+        else
+        {
+            /* TODO
+            * check if address is not there yet
+            * add address and state to EEPROM, 
+            *  
+            */
+        }
+    }
+    else                                                                        // if not recording, lay the streets.
+    {
+        pinMode(13, INPUT_PULLUP );
+        if( Address < BASE_ADDRESS || Address >= (BASE_ADDRESS + 20) ) return ;
+
+        setStreet( Address - BASE_ADDRESS ) ;
+    }
 }
 
 
@@ -87,51 +124,6 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed >   100                ) knob = 0 ;
 }
 
-// void setPoint( uint8_t Address, uint8_t functions ) // OBSOLETE
-// {
-//     if( Address != 1) return ;   
-
-//     static uint16 prevFunctions[3][5] ;
-//     uint8 number ;
-//     uint8 index ;
-
-//     switch( functions & 0xC0 )
-//     {
-//     case  F0_F4 : index = 0 ; functions &= 0x0F ; number = 0 ;/* Serial.println( "F0_F4" ) ;*/ break ;
-//     case  F5_F8 : index = 1 ; functions &= 0x0F ; number = 4 ;/* Serial.println( "F5_F8" ) ;*/ break ;
-//     case F9_F12 : index = 2 ; functions &= 0x03 ; number = 8 ;/* Serial.println("F9_F10" ) ;*/ break ;
-//     }
-
-//     for( int bitMask = 0x01 ; bitMask > 0x10 ; bitMask <<= 1 )                        // check which of the 4 bits has changed
-//     {       
-//         number ++ ;  
-
-//         if( (functions & bitMask) != (prevFunctions[index][knob] & bitMask ) )              // check all 4 bits for F1 - F4, if atleast 1 bit has changed
-//         {
-//             if( functions & bitMask ) { prevFunctions[index][knob]  |= bitMask ;/* printNumberln("setting:  ", number); */ }
-//             else                      { prevFunctions[index][knob] &= ~bitMask ;/* printNumberln("clearing: ", number); */ }      
-
-//             uint8 pointNumber = number += ( knob * 10 ) ;                       // 5 groups
-
-//             bool state = (prevState >> pointNumber) & 1 ;                       // get last state
-//             state ^= 1 ;                                                        // toggle state
-
-//             #ifndef debug
-//             Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
-//             delay(20) ;
-//             Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
-
-//             if( state == 0 ) prevState &= ~( 1 << pointNumber ) ;               // store new state
-//             else             prevState |=  ( 1 << pointNumber ) ; 
-
-//             #else
-//             printNumber_( "point: ", pointNumber ) ; Serial.println( state ) ;
-//             #endif
-            
-//             return ;
-//         }
-//     }
-// }
 
 void setFunc( uint8 val )
 {
