@@ -31,7 +31,7 @@ volatile uint16 eeAddress  = 0 ;
 
 volatile unsigned long long oldState ; // 64 bits
 
-volatile uint16  points[ nPointsPerStreet ] ;
+
 volatile uint8   pointIndex = 100 ;      // something high
 
 
