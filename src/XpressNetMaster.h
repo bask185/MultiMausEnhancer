@@ -30,7 +30,7 @@
 	- fix Locomotive speed and direction operation (0xE4) Speed Steps
 	- fix range CV# Adr to uint16_t
 */
-//#define debug
+#define debug
 
 // ensure this library description is only included once
 #ifndef XpressNetMaster_h
@@ -38,7 +38,7 @@
 
 //CONFIG:
 #define XNetVersion 0x36	//System Bus Version
-#define XNetID 0x10	//Zentrale: 
+#define XNetID 0x02	//Zentrale: 
 //0x00 = LZ100; 
 //0x01 = LH200; 
 //0x10 = ROCO MultiMaus; 
@@ -269,7 +269,7 @@ class XpressNetMasterClass
 	extern void notifyXNetLocoFunc5(uint16_t Address, uint8_t Func5) __attribute__((weak));//Gruppe5 F28-F21
 	//Weichenbefehl:
 	extern void notifyXNetTrntInfo(uint8_t UserOps, uint8_t Address, uint8_t data) __attribute__((weak));// data=0000 000N	N=Nibble N0-(0,1); N1-(2,3);
-	extern void notifyXNetTrnt(uint16_t Address, uint8_t data) __attribute__((weak));// data=0000 000A	A=Weichenausgang (Aktive/Inaktive);
+	extern void notifyXNetTrnt(uint16_t Address, uint8_t data);/* __attribute__((weak));*/// data=0000 000A	A=Weichenausgang (Aktive/Inaktive);
 	//R�ckmeldung:
 	extern void notifyXNetFeedback(uint16_t Address, uint8_t data) __attribute__((weak));// data=0000 000A	A=Weichenausgang (Aktive/Inaktive);
 	//CV:

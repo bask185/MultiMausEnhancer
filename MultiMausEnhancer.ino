@@ -21,7 +21,7 @@ XpressNetMasterClass Xnet ;
 
 uint8   knob ;
 
-volatile uint16 eeAddress  = 0 ;
+uint16 eeAddress1  = 0 ;
 
 volatile unsigned long long oldState ; // 64 bits
 
@@ -35,12 +35,21 @@ void setPoint( uint16 pointAddress, uint8 state )
     #endif
 }
 
+void setFunc( uint8 val )
+{
+   pinMode(A7, INPUT) ;  
+   EEPROM.write( eeAddress1++, val ) ;
+}
+
 void notifyXNetTrnt( uint16_t Address, uint8_t data )                           // setting point 101, gives us 100 back
 {
     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
-    passPoint( Address | (data<<15) ) ;
-}
+    // passPoint( Address | (data<<15) ) ;
 
+    setFunc( Address ) ;
+    setFunc( data ) ;
+
+}
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
@@ -59,10 +68,7 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed >   100                ) knob = 0 ;
 }
 
-void setFunc( uint8 val )
-{
-   // EEPROM.write( eeAddress++, val ) ;
-}
+
 
 void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
 {
@@ -113,41 +119,7 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( A
 
 void setup()
 {
-    uint16_t eeAddress = 0 ;
-    // EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ; this seems to work well
-    // EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 4   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 5   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 6   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 7   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 8   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 9   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 10  ) ; eeAddress++ ;
 
-    // EEPROM.put( eeAddress++, STRAIGHT | 1   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 2   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 3   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 4   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 5   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 6   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 7   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 8   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 9   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 10  ) ; eeAddress++ ;
-
-    // points[ 0 ] = CURVED   | 1 ;
-    // points[ 1 ] = CURVED   | 2 ;
-    // points[ 2 ] = CURVED   | 3 ;
-    // points[ 3 ] = CURVED   | 4 ;
-    // points[ 4 ] = CURVED   | 5 ;
-    // points[ 5 ] = STRAIGHT | 6 ;
-    // points[ 6 ] = STRAIGHT | 7 ;
-    // points[ 7 ] = STRAIGHT | 8 ;
-    // points[ 8 ] = STRAIGHT | 9 ;
-    // points[ 9 ] = STRAIGHT | 10 ;
-
-    // points[ 10 ] = 0xFFFF ;
 
 
     #ifndef debug
@@ -155,12 +127,11 @@ void setup()
     beginEeprom() ;
     #else
     Serial.begin( 115200 ) ;
-    //uint16 eeAddress = 0 ;
     for( uint16 i = 0 ; i < 100 ; i ++ )
     {
       
-        uint8 a = EEPROM.read( eeAddress ++ ) ;
-        uint8 b = EEPROM.read( eeAddress ++ ) ;
+        uint8 a = EEPROM.read( eeAddress1 ++ ) ;
+        uint8 b = EEPROM.read( eeAddress1 ++ ) ;
         // uint8 c = EEPROM.read( eeAddress ++ ) ;
         // uint8 d = EEPROM.read( eeAddress ++ ) ;
         Serial.print( a ) ; Serial.print("   "); Serial.println( b ) ;// Serial.print("   "); Serial.print( c ) ;  Serial.print("   "); Serial.println( d ) ;
@@ -175,6 +146,6 @@ void loop()
 
     #ifndef debug
     Xnet.update() ;
-    handlePoints() ;
+    //handlePoints() ;
     #endif
 }
