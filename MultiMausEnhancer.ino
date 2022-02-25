@@ -14,96 +14,31 @@
 #define CURVED   0x0000
 #define STRAIGHT 0x8000
 
-#define BASE_ADDRESS 100 
-#define MAX_ADDRESS 1024
-
 #ifndef debug
 XpressNetMasterClass Xnet ;
 #endif
 
 
 uint8   knob ;
-volatile uint8   recording ;
-volatile uint8   gettingStreetIndex ;
-volatile uint8   streetIndex ;
 
 volatile uint16 eeAddress  = 0 ;
 
 volatile unsigned long long oldState ; // 64 bits
 
 
-volatile uint8   pointIndex = 100 ;      // something high
-
-
-void settingPoints()
+void setPoint( uint16 pointAddress, uint8 state )
 {
-    if( pointIndex > nPointsPerStreet ) return ;
-
-    REPEAT_MS( 500 )
-    {
-    nextPoint:
-        uint16 pointNumber = points[ pointIndex ] & 0x03FF ;
-        uint8  state       = points[ pointIndex ] >> 15 ;
-        pointIndex ++ ;
-
-        if( pointIndex > nPointsPerStreet ) return ;
-        //if( pointNumber >= MAX_ADDRESS )   goto nextPoint ;
-
-        #ifndef debug
-        Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
-        delay(20) ;
-        Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
-        #endif
-
-    } END_REPEAT
+    #ifndef debug
+    Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                  // BUG needs to be wrapper function, no acces to Xnet object here
+    delay(20) ;
+    Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
+    #endif
 }
-void setStreet( uint8 streetNumber )
-{
-    pinMode(13, INPUT_PULLUP );
-    uint16 eeAddress = streetNumber * nPointsPerStreet * 2 ;                      // calculate address
-   
-    EEPROM.get( eeAddress, points ) ;                                             // fetch array from EEPROM
-    pointIndex = 0 ;                                                                // reset this index for setting a street
-}
-void notifyXNetTrnt( uint16_t Address, uint8_t data )                               // setting point 101, gives us 100 back
-{
-    if( Address == (BASE_ADDRESS - 1) )
-    {
-        bool state = data & 1 ;
-        if( state == 1 ) { recording =  true ; gettingStreetIndex = true ; }
-        else             { recording = false ; }
-        return ;
-    }
 
-    if( recording )
-    {
-        if( gettingStreetIndex == true )
-        {
-            if( Address < BASE_ADDRESS || Address >= (BASE_ADDRESS + nStreets ) ) return ; // check for valid address
-           
-            streetIndex = Address - BASE_ADDRESS ;
-            gettingStreetIndex = false ;
-            clear( streetIndex ) ;
-            /* TODO
-            * whipe part for EEPROM for new point street
-            */
-        }
-        else
-        {
-            /* TODO
-            * check if address is not there yet
-            * add address and state to EEPROM, 
-            *  
-            */
-        }
-    }
-    else                                                                        // if not recording, lay the streets.
-    {
-        pinMode(13, INPUT_PULLUP );
-        if( Address < BASE_ADDRESS || Address >= (BASE_ADDRESS + 20) ) return ;
-
-        setStreet( Address - BASE_ADDRESS ) ;
-    }
+void notifyXNetTrnt( uint16_t Address, uint8_t data )                           // setting point 101, gives us 100 back
+{
+    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+    passPoint( Address | (data<<15) ) ;
 }
 
 
@@ -124,12 +59,10 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed >   100                ) knob = 0 ;
 }
 
-
 void setFunc( uint8 val )
 {
-    EEPROM.write( eeAddress++, val ) ;
+   // EEPROM.write( eeAddress++, val ) ;
 }
-
 
 void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
 {
@@ -162,9 +95,7 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is veriv
 
             uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
 
-            Xnet.SetTrntPos( pointNumber - 1, state, 1 ) ;                      // set new state
-            delay(20) ;
-            Xnet.SetTrntPos( pointNumber - 1, state, 0 ) ;
+            setPoint( pointNumber, state ) ;
             
             //setFunc( fKey ) ;                                                 // VERIVIED
             //setFunc( state ) ;                                                // VERIVIED
@@ -173,7 +104,7 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is veriv
     }
 }
 
-void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { functionPressed( Address, Func1,   F0_F4 ) ; } //            F0    F4  F3  F2  F1
+void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { functionPressed( Address, Func1,   F0_F4 ) ; } //              F0  F4  F3  F2  F1
 void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { functionPressed( Address, Func2,   F5_F8 ) ; } //                  F8  F7  F6  F5
 void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( Address, Func3,  F9_F12 ) ; } //                 F12 F11 F10  F9
 void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
@@ -218,10 +149,10 @@ void setup()
 
     // points[ 10 ] = 0xFFFF ;
 
-    // pointIndex = 100 ;
 
     #ifndef debug
     Xnet.setup( Loco28, RS485DIR ) ;
+    beginEeprom() ;
     #else
     Serial.begin( 115200 ) ;
     //uint16 eeAddress = 0 ;
@@ -244,6 +175,6 @@ void loop()
 
     #ifndef debug
     Xnet.update() ;
-    settingPoints() ;    
+    handlePoints() ;
     #endif
 }

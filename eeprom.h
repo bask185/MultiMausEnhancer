@@ -1,9 +1,15 @@
 #include <Arduino.h>
 #include "src/macros.h"
 
-const int nPointsPerStreet = 16 ;
-const int nStreets = 16 ;
+enum
+{
+    IDLE,
+    settingStreet,
+    getIndex,
+    addPoints,
+} ;
 
-
-extern void clearStreet( uint8 streetIndex ) ;
-extern void addPoint( uint16 point ) ;
+extern void beginEeprom() ;
+extern uint8_t handlePoints () ;
+extern void passPoint( uint16 ) ;
+extern void setPoint( uint16, uint8 ) ;

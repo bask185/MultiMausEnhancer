@@ -1,51 +1,193 @@
 #include "eeprom.h"
+#include <EEPROM.h>
+#include "src/stateMachineClass.h"
 
-uint16  points[ nPointsPerStreet ] ;
+
+const int nPointsPerStreet = 16 ;
+const int nStreets = 16 ;
+const int baseAddress = 100 ;
+const int endAddress (baseAddress + nPointsPerStreet) ;
+// const int maxAddress = 1024 ;   unused
+
+static StateMachine sm ;
+
+uint16  points[ nPointsPerStreet ] ;    // array to store one street in
+
 uint16  streetIndex ;
 uint16  pointIndex ;
+uint16  newAddress ;
+uint16  oldAddress ;
+bool    newState ;
+uint16  newRaw ;
 
-void clearStreet( uint8 _streetIndex ) 
+void beginEeprom()
 {
-    streetIndex = _streetIndex ;
+    sm.setState( IDLE ) ;
+}
 
-    uint16 beginAddress = streetIndex * nPointsPerStreet * 2 ;                  // 0 -> 0, 1 -> 32, 2-> 64, 3 -> 96  ...  16 -> 512
-    uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;
-    for ( uint16 address = beginAddress ; address < streetIndex + (nPointsPerStreet * 2) ; address++ ) 
+void passPoint( uint16 _address )
+{
+    newRaw     = _address ;
+    newAddress = newRaw & 0x3FFF ;
+    newState   = newRaw >> 15 ;
+}
+
+
+
+/* NOTE
+need control functions
+Need to be able to send STATE and ADDRESS of points to this file
+*/
+
+StateFunction( IDLE )
+{
+    if( sm.entryState() )
     {
-        EEPROM.write( address, 0xFF ) ;
+        newAddress = oldAddress = 9999 ;
     }
-}
-
-void addPoint( uint16 newAddress )
-{
-    bool pointIsTaken = false ;
-    uint16 beginAddress = streetIndex * nPointsPerStreet * 2 ;                  // 0 -> 0, 1 -> 32, 2-> 64, 3 -> 96  ...  16 -> 512
-    uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;
-    for ( uint16 eeAddress = beginAddress ; eeAddress < streetIndex + (nPointsPerStreet * 2) ; eeAddress++ ) 
+    if( sm.onState() )
     {
-        uint16 currentAddress ;
-        EEPROM.get( eeAddress, currentAddress );
+        if( newAddress == baseAddress && newState == true                      // -> teachin points
+        ||( newAddress  > baseAddress && newAddress <= endAddress ) )          // -> set one of the streets
+        {
+            sm.exit() ;
+        }
+    }
+    if( sm.exitState() )
+    {
 
-        if( (newAddress & 0x3FFF) == (newAddress & 0x3FFF) ) pointIsTaken = true ; // ERROR BUG need to update same point in the event of the state changes
+    }
+    return sm.endState() ;
+}
+
+StateFunction( settingStreet )
+{
+    if( sm.entryState() )
+    {
+        streetIndex = newAddress - baseAddress ;
+        uint16 eeAddress = streetIndex * nPointsPerStreet * 2 ;                 // calculate address
+
+        EEPROM.get( eeAddress, points ) ;                                       // load array from EEPROM
+        pointIndex = 0 ;     
+    }
+    if( sm.onState() )
+    {
+        if( sm.repeat( 500 ) )                                                        // set a point every 500ms
+        {
+            uint16 raw = points[ pointIndex ++ ] ;
+            uint16 pointAddress = raw & 0x03FF ;
+            uint8  state        = raw >> 15 ;
+
+            if( pointIndex == nPointsPerStreet 
+            ||  raw == 0xFFFF )
+            {
+                sm.exit() ;                                                     // if max amount is reached or invalid addres -> exit
+            }
+            else                                                                // otherwise set the point
+            {
+                setPoint( pointAddress, state ) ;
+            }
+        }
+    }
+    if( sm.exitState() )
+    {
+        
+    }
+    return sm.endState() ;
+}
+
+StateFunction( getIndex )
+{
+    if( sm.entryState() )
+    {
+
+    }
+    if( sm.onState() )
+    {
+        if( newAddress > baseAddress                                            // if valid address for street index is entered, go on
+        &&  newAddress <= endAddress ) 
+        {
+            sm.exit() ;
+        }
+    }
+    if( sm.exitState() )
+    {
+        streetIndex = newAddress - baseAddress ;                                // calculate street index and whipe matching part in EEPROM
+
+        uint16 beginAddress = streetIndex  *  nPointsPerStreet * 2  ;           
+        uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;
+
+        for ( uint16 address = beginAddress ; address < endAddress ; address++ ) 
+        {
+            EEPROM.write( address, 0xFF ) ;
+        }  
     }
 
-    if( pointIsTaken == true ) return ;                                         // if address is already taken
-
-    uint16 eeAddress = streetIndex * nPointsPerStreet * 2 + (pointIndex * 2 )  ;
-
-    EEPROM.put( eeAddress, newAddress ) ;
-    pointIndex ++ ;
+    return sm.endState() ;
 }
 
-void getStreet( uint16 *ptr uint8 streetIndex )
+/*
+    adding a point:
+    need to uncondonditionally store the new address with state on current index. 
+    If the address differs with the previous address, the index needs to be incremented first.
+    if the index reaches the value of nPointsPerStreet OR the point with base address is set straight, we exit
+*/
+StateFunction( addPoints )
 {
-    uint16 eeAddress = streetIndex * nPointsPerStreet * 2 ;                      // calculate address
-
-    EEPROM.get( eeAddress, points ) ;                                             // fetch array from EEPROM
-    pointIndex = 0 ;  
+    if( sm.entryState() )
+    {
+        pointIndex = 0 ;
+        oldAddress = newAddress = 9999 ;
+    }
+    if( sm.onState() ) // BUG prevent that this can run limitless
+    {
+        if( newAddress != oldAddress )
+        {   oldAddress  = newAddress ;
+            
+            pointIndex ++ ;
+        
+            if( pointIndex == nPointsPerStreet                                      // if we added max amount of points
+            ||  newAddress == baseAddress )                                         // or base address is entered...
+            {
+                sm.exit() ;                                                         // -> exit
+            }
+            else
+            {
+                uint16 eeAddress ; // ADDED CALCULATION HERE
+                EEPROM.put(eeAddress, newAddress) ;                                 // otherwise store the point
+            }
+        }
+    }
+    if( sm.exitState() )
+    {
+        
+    }
+    return sm.endState() ;
 }
 
-uint16 getPoint()
+/**
+ * @brief FSM for handling storing and setting point streets
+ * 
+ * @return current state
+ *  
+ */
+
+uint8 handlePoints ()
 {
-    EEPROM.get( eeAddress, points ) ;
+    STATE_MACHINE_BEGIN
+
+        State( IDLE ) {
+            if( newAddress == baseAddress ) sm.nextState( getIndex, 0 ) ;
+            else                            sm.nextState( settingStreet, 0 ) ; }
+
+        State( settingStreet ) {
+            sm.nextState( IDLE, 0 ) ; }
+
+        State( getIndex ) {
+            sm.nextState( addPoints, 0 ) ; }
+
+        State( addPoints ) {
+            sm.nextState(IDLE, 0 ) ; }
+
+    STATE_MACHINE_END
 }
