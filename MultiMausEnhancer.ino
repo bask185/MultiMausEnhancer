@@ -1,4 +1,5 @@
 #include "src/version.h"
+#include "src/io.h"
 #include "src/macros.h"
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
@@ -37,20 +38,33 @@ void setPoint( uint16 pointAddress, uint8 state )
 
 void setFunc( uint8 val )
 {
-   pinMode(A7, INPUT) ;  
-   EEPROM.write( eeAddress1++, val ) ;
+   // static uint16_t eeAddress = 0 ; 
+   // pinMode(A7, INPUT) ;  
+
+   // EEPROM.write( eeAddress++, val ) ;
 }
+// void notifyXNetTrnt(uint16_t Address, uint8_t data)
+// {
+//   //  static uint8 counter = 0 ;
+//   //  pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+//  //   Address ++;
+    
+//     if (bitRead(data,3) == 0x01)
+//     { 
+//         if( data & 0x01 ) digitalWrite( led, HIGH ) ;
+//         else              digitalWrite( led,  LOW ) ;
+//     }// passPoint( Address | (data<<15) ) ;
 
-void notifyXNetTrnt( uint16_t Address, uint8_t data )                           // setting point 101, gives us 100 back
-{
-    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
-    // passPoint( Address | (data<<15) ) ;
 
-    setFunc( Address ) ;
-    setFunc( data ) ;
+//         //setFunc( counter ++ ) ;
+//         //setFunc( Address & 0xFF ) ;
+//         //setFunc( data ) ;
+//     // EEPROM.write( eeAddress1++, eeAddress1 ) ;
+//     // EEPROM.write( eeAddress1++, Address ) ;
+//     // EEPROM.write( eeAddress1++, data ) ;
 
-}
-
+// }
+/*
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
     static uint8 state = 0 , prevKnob = 0xFF ;
@@ -67,7 +81,7 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed <=  100 && speed >  20 ) knob = 1 ;
     else if(    speed >   100                ) knob = 0 ;
 }
-
+*/
 
 
 void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
@@ -116,15 +130,29 @@ void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( A
 void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
 
 
-
+// void notifyXNetPower(uint8_t State)
+// {
+//     if( State == csNormal ) digitalWrite(led, HIGH);
+//     else                    digitalWrite(led,  LOW);
+// }
 void setup()
 {
 
+    initIO() ; 
+
+    for (int i = 0; i < 10; i++)
+    {
+            digitalWrite( led, HIGH ) ;
+    delay(100);
+    digitalWrite( led,LOW ) ;
+    delay(100);
+    }
+    
 
 
     #ifndef debug
     Xnet.setup( Loco28, RS485DIR ) ;
-    beginEeprom() ;
+    //beginEeprom() ;
     #else
     Serial.begin( 115200 ) ;
     for( uint16 i = 0 ; i < 100 ; i ++ )
@@ -132,9 +160,9 @@ void setup()
       
         uint8 a = EEPROM.read( eeAddress1 ++ ) ;
         uint8 b = EEPROM.read( eeAddress1 ++ ) ;
-        // uint8 c = EEPROM.read( eeAddress ++ ) ;
+        uint8 c = EEPROM.read( eeAddress1 ++ ) ;
         // uint8 d = EEPROM.read( eeAddress ++ ) ;
-        Serial.print( a ) ; Serial.print("   "); Serial.println( b ) ;// Serial.print("   "); Serial.print( c ) ;  Serial.print("   "); Serial.println( d ) ;
+        Serial.print( a ) ; Serial.print("   "); Serial.print( b ) ; Serial.print("   "); Serial.println( c ) ;//  Serial.print("   "); Serial.println( d ) ;
         
     }
     while(1);
