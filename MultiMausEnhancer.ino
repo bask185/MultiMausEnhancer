@@ -167,7 +167,7 @@ void setup()
     }
     #endif
 }
-
+#ifdef DEBUG
 void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
 {
     if( Serial.available() > 0)
@@ -186,6 +186,7 @@ void readSerialBus()                                                            
         passPoint( address | (state << 15) ) ;        
     }
 }
+#endif
 
 void loop()
 {

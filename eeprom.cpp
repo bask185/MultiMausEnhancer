@@ -37,11 +37,11 @@ void beginEeprom()
 
 #else
 
-#define debug( x ) [;]
-#define _debug( x ) [;]
-#define debugln( x )
-#define debugNumber( x ) [;]
-#define debugNumberln( x ) [;]
+#define debug( x ) ;
+#define _debug( x ) ;
+#define debugln( x ) ;
+#define debugNumber( x ) ;
+#define debugNumberln( x ) ;
 
 #endif
 
