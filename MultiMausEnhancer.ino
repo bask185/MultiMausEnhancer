@@ -41,7 +41,7 @@ void setPoint( uint16 pointAddress, uint8 state )
 void notifyXNetTrnt( uint16_t Address, uint8_t data )                           // setting point 101, gives us 100 back
 {
     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
-    passPoint( Address | (data<<15) ) ;
+    passPoint( (Address+1) | (data<<15) ) ;
 }
 
 
