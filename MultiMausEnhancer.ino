@@ -1,8 +1,10 @@
 #include "src/version.h"
 #include "src/macros.h"
+#include "src/io.h"
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include "eeprom.h"
+#include "event.h"
 
 #define RS485DIR 2
 
@@ -28,6 +30,7 @@ volatile unsigned long long oldState ; // 64 bits
 
 void setPoint( uint16 pointAddress, uint8 state )
 {
+    setEvent( pointSet ) ;
     #ifndef DEBUG
     Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                  // BUG needs to be wrapper function, no acces to Xnet object here
     delay(20) ;
@@ -114,6 +117,8 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( A
 void setup()
 {
     uint16_t eeAddress = 0 ;
+    setMode( idling ) ;
+
     // EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ; this seems to work well
     // EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
     // EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
@@ -148,7 +153,7 @@ void setup()
     // points[ 9 ] = STRAIGHT | 10 ;
 
     // points[ 10 ] = 0xFFFF ;
-
+    initIO() ;
 
     #ifndef DEBUG
     Xnet.setup( Loco28, RS485DIR ) ;
@@ -191,6 +196,7 @@ void readSerialBus()                                                            
 void loop()
 {
     handlePoints() ;
+    eventHandler() ;
 
     #ifndef DEBUG
     Xnet.update() ;
