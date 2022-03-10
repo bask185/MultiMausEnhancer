@@ -1,6 +1,8 @@
 #include "eeprom.h"
+#include "event.h"
 #include <EEPROM.h>
 #include "src/stateMachineClass.h"
+#include "src/XpressNetMaster.h"
 
 
 const int nPointsPerStreet = 16 ;
@@ -14,36 +16,60 @@ static StateMachine sm ;
 uint16  points[ nPointsPerStreet ] ;    // array to store one street in
 
 uint16  streetIndex ;
-uint16  pointIndex ;
+int16   pointIndex ;
 uint16  newAddress ;
 uint16  oldAddress ;
 bool    newState ;
 uint16  newRaw ;
+bool    pointReceived = false ;
 
 void beginEeprom()
 {
     sm.setState( IDLE ) ;
 }
 
+#ifdef DEBUG
+
+#define debug( x ) {Serial.print( x ) ; }
+#define _debug( x ) { Serial.write(' ') ; Serial.print( x ) ; } 
+#define debugln( x ) { Serial.println( x ) ; }
+#define debugNumber(  x ) { Serial.print( x ) ; }
+#define debugNumberln( x ) { Serial.println( x ) ; }
+
+#else
+
+#define debug( x ) ;
+#define _debug( x ) ;
+#define debugln( x ) ;
+#define debugNumber( x ) ;
+#define debugNumberln( x ) ;
+
+#endif
+
+
 void passPoint( uint16 _address )
 {
     newRaw     = _address ;
     newAddress = newRaw & 0x3FFF ;
     newState   = newRaw >> 15 ;
+    debug("new address = "); debugNumber(newAddress); 
+    debug(" new state "); debugNumberln( newState ) ;
+    pointReceived = true ;
 }
-
 
 
 /* NOTE
 need control functions
 Need to be able to send STATE and ADDRESS of points to this file
 */
-
 StateFunction( IDLE )
 {
     if( sm.entryState() )
     {
         newAddress = oldAddress = 9999 ;
+        debug("IDLE") ;
+
+        setMode( idling ) ;
     }
     if( sm.onState() )
     {
@@ -55,7 +81,7 @@ StateFunction( IDLE )
     }
     if( sm.exitState() )
     {
-
+       // debug("new address ") ; debugNumberln( newAddress ) ;
     }
     return sm.endState() ;
 }
@@ -68,11 +94,15 @@ StateFunction( settingStreet )
         uint16 eeAddress = streetIndex * nPointsPerStreet * 2 ;                 // calculate address
 
         EEPROM.get( eeAddress, points ) ;                                       // load array from EEPROM
-        pointIndex = 0 ;     
+        pointIndex = 0 ; 
+        debug("setting street: ") ;  debugNumberln( streetIndex ) ;    
+        debug("eeprom address = ") ; debugNumberln( eeAddress ) ;    
+
+        setMode( settingPoints ) ;
     }
     if( sm.onState() )
     {
-        if( sm.repeat( 500 ) )                                                        // set a point every 500ms
+        if( sm.repeat( 1500 ) )                                                        // set a point every 500ms
         {
             uint16 raw = points[ pointIndex ++ ] ;
             uint16 pointAddress = raw & 0x03FF ;
@@ -86,11 +116,15 @@ StateFunction( settingStreet )
             else                                                                // otherwise set the point
             {
                 setPoint( pointAddress, state ) ;
+                debug("setting point ") ; debugNumber( pointAddress ) ; if( state ) debugln(" curved") else debugln(" straight") 
             }
         }
     }
     if( sm.exitState() )
     {
+        if( pointIndex == nPointsPerStreet )  debugln("max points reached")
+        else                                  debugln("invalid address")
+
         
     }
     return sm.endState() ;
@@ -100,7 +134,8 @@ StateFunction( getIndex )
 {
     if( sm.entryState() )
     {
-
+        setEvent( enteringTeachin ) ;
+        debugln("getting street index for teaching in points") ;
     }
     if( sm.onState() )
     {
@@ -117,10 +152,17 @@ StateFunction( getIndex )
         uint16 beginAddress = streetIndex  *  nPointsPerStreet * 2  ;           
         uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;
 
+        debug("received index = "); debugNumberln( streetIndex ) ; 
+        debug("clearing street from: "); debugNumber( beginAddress ) ; 
+        debug(" to: "); debugNumberln( endAddress ) ; 
+
         for ( uint16 address = beginAddress ; address < endAddress ; address++ ) 
         {
             EEPROM.write( address, 0xFF ) ;
         }  
+        debugln("street wiped!");
+
+        setEvent( indexReceived ) ;
     }
 
     return sm.endState() ;
@@ -136,31 +178,50 @@ StateFunction( addPoints )
 {
     if( sm.entryState() )
     {
-        pointIndex = 0 ;
+        pointReceived = false ;
+        pointIndex = -1 ;
         oldAddress = newAddress = 9999 ;
+        debugln("adding points");
+
+        setMode( teachin ) ;
     }
-    if( sm.onState() ) // BUG prevent that this can run limitless
+    if( sm.onState() )
     {
-        if( newAddress != oldAddress )
-        {   oldAddress  = newAddress ;
-            
-            pointIndex ++ ;
-        
-            if( pointIndex == nPointsPerStreet                                      // if we added max amount of points
-            ||  newAddress == baseAddress )                                         // or base address is entered...
+        if( pointReceived == true )
+        {   pointReceived  = false ;
+
+            if( newAddress != oldAddress )
+            {   oldAddress  = newAddress ;
+                
+                pointIndex ++ ;
+                debug("new address, index = ") ;
+                debugNumberln( pointIndex ) ;
+            }
+
+            if( pointIndex == nPointsPerStreet                                  // if we added max amount of points FIXME
+            ||  newAddress == baseAddress )                                     // or base address is entered...
             {
-                sm.exit() ;                                                         // -> exit
+                sm.exit() ;                                                     // -> exit
             }
             else
             {
-                uint16 eeAddress ; // ADDED CALCULATION HERE
-                EEPROM.put(eeAddress, newAddress) ;                                 // otherwise store the point
+                uint16 eeAddress = streetIndex * nPointsPerStreet * 2 + (pointIndex*2); 
+                EEPROM.put(eeAddress, newAddress | (newState<<15)) ;            // otherwise store the point
+
+                debug("storing point: ") ;  debugNumber( newAddress & 0x03FF ) ;
+                debug(" state: ") ;         debugNumber( newState ) ;
+                debug(" on address: ") ;    debugNumberln( eeAddress ) ;
+
+                setEvent( pointAdded ) ;
             }
         }
     }
     if( sm.exitState() )
     {
-        
+        if( pointIndex == nPointsPerStreet ) debugln("maximum amount of points added")
+        else                                 debugln("base address received, all points saved")
+
+        setEvent( leavingTeachin ) ;
     }
     return sm.endState() ;
 }

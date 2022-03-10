@@ -1,35 +1,37 @@
-/*
-*****************************************************************************
-  *		XpressNetMaster.h - library for XpressNet protocoll
-  *		Copyright (c) 08/2016 - 2022 Philipp Gahtow  All right reserved.
-  *
-*****************************************************************************
-  * FUNKTIONS:
-  *
-  *		Build a XpressNet Master for driving and switch
-  *		Support for Roco LokMaus2 and Multimaus
-  *		Basic support for direct CV programming (read and write)
-  *		Check XOR before packet dekoding
-  * 
-  * 	-> Please contact Lenz Inc. for more details about XpressNet.
-  *
-  * not yet Supported:
-  *	- Emergency stop a locomotive: 0x92 AddrH AddrL [XOR]
-  *	- Emergency stop a locomotive: 0x91 loco_addr [XOR] (v2)
-  *	- Service Mode: only direct Mode
-  *	- DCC extended accessory command: 0x13 0x01 B+AddrH AddrL
-  *	- DCC FAST CLOCK: 0x01 0xF2 0xF3
-  *	- Command Tunnel: 0x3* ** ** [XOR]
-  *	- BiDi messages: 0x7* ** ** [XOR]
-  *	- Library Entry: 0xE9 0xF1 AddrH AddrL IDX SIZE [NAME][XOR]
-  *	- Set function state: 0xE4 0x2* AddrH AddrL Group [XOR]
-*****************************************************************************
-*/
+// /*
+// *****************************************************************************
+//   *		XpressNetMaster.h - library for XpressNet protocoll
+//   *		Copyright (c) 08/2016 - 2020 Philipp Gahtow  All right reserved.
+//   *
+// *****************************************************************************
+//   * FUNKTIONS:
+//   *
+//   *		Build a XpressNet Master for driving and switch
+//   *		Support for Roco LokMaus2 and Multimaus
+//   *		Basic support for direct CV programming (read and write)
+//   *		Check XOR before packet dekoding
+//   * 
+//   * 	-> Please contact Lenz Inc. for more details about XpressNet.
+//   *
+//   * not yet Supported:
+//   *	- Emergency stop a locomotive: 0x92 AddrH AddrL [XOR]
+//   *	- Emergency stop a locomotive: 0x91 loco_addr [XOR] (v2)
+//   *	- Service Mode: only direct Mode
+//   *	- DCC extended accessory command: 0x13 0x01 B+AddrH AddrL
+//   *	- DCC FAST CLOCK: 0x01 0xF2 0xF3
+//   *	- Command Tunnel: 0x3* ** ** [XOR]
+//   *	- BiDi messages: 0x7* ** ** [XOR]
+//   *	- Library Entry: 0xE9 0xF1 AddrH AddrL IDX SIZE [NAME][XOR]
+//   *	- Set function state: 0xE4 0x2* AddrH AddrL Group [XOR]
+// *****************************************************************************
+// */
 
-// include this library's description file
+// // include this library's description file
+
 #include "XpressNetMaster.h"
 
-#ifndef debug
+
+#ifndef DEBUG
 
 #if defined(__AVR__)
 #include <avr/interrupt.h>

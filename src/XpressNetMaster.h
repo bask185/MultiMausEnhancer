@@ -1,38 +1,38 @@
-/*
-  XpressNetMaster.h - library for XpressNet Master protocoll
-  Copyright (c) 2022 Philipp Gahtow  All right reserved.
-  Notice:
-  Support for XPressNet Version 3.0 or 3.6!
-  Change History:
-	- timing issue when change to the next slot
-	- add busy request for loco
-	- narrow conversation compiler warning
-	- speed up transmission window (Callbyte) and adjust timing
-	- add MultiMaus full Support for F13 to F20
-	- add unknown message return
-	- add UART RX interrupt
-	- add UART TX Buffer with interrupt control
-	- fix MultiMaus CV read and write in Master Mode
-	- fix speed step setting
-	- add ack request answer in slave mode
-	- add feedback return to all clients
-	- add POM write byte and bit
-	- fix slave ack return
-	- add support for RAW Data in-/output
-	- add inside 'AddBusySlot' a skip if already busy by this slot
-	- adjust init client mode power setting
-	- add support ESP8266 with RS485SoftwareSerial
-	- fix sending long Adresses missing the two highest bits of the High bytes are set to "1" (0xC000)
-	- fix hanging in CV-Prog
-	- fix Accessory Decoder operation request Byte 2
-	- fix Locomotive speed and direction operation (0xE4) Speed Steps
-	- fix range CV# Adr to uint16_t
-	- add software serial support for ESP8266 and ESP32
-*/
+// /*
+//   XpressNetMaster.h - library for XpressNet Master protocoll
+//   Copyright (c) 2020 Philipp Gahtow  All right reserved.
 
-// #define debug
+//   Notice:
+//   Support for XPressNet Version 3.0 or 3.6!
 
-#ifndef debug
+//   Change History:
+// 	- timing issue when change to the next slot
+// 	- add busy request for loco
+// 	- narrow conversation compiler warning
+// 	- speed up transmission window (Callbyte) and adjust timing
+// 	- add MultiMaus full Support for F13 to F20
+// 	- add unknown message return
+// 	- add UART RX interrupt
+// 	- add UART TX Buffer with interrupt control
+// 	- fix MultiMaus CV read and write in Master Mode
+// 	- fix speed step setting
+// 	- add ack request answer in slave mode
+// 	- add feedback return to all clients
+// 	- add POM write byte and bit
+// 	- fix slave ack return
+// 	- add support for RAW Data in-/output
+// 	- add inside 'AddBusySlot' a skip if already busy by this slot
+// 	- adjust init client mode power setting
+// 	- add support ESP8266 with RS485SoftwareSerial
+// 	- fix sending long Adresses missing the two highest bits of the High bytes are set to "1" (0xC000)
+// 	- fix hanging in CV-Prog
+// 	- fix Accessory Decoder operation request Byte 2
+// 	- fix Locomotive speed and direction operation (0xE4) Speed Steps
+// 	- fix range CV# Adr to uint16_t
+// */
+// #define DEBUG
+
+#ifndef DEBUG
 
 // ensure this library description is only included once
 #ifndef XpressNetMaster_h
@@ -279,6 +279,7 @@ class XpressNetMasterClass
 #endif
 
 
+#endif
 #endif
 
 #endif

@@ -1,2 +1,4 @@
 2	RS485DIR	OUTPUT
-A5	led	OUTPUT
+3	greenLed	OUTPUT
+13	yellowLed	OUTPUT
+5	redLed	OUTPUT

@@ -1,9 +1,11 @@
 #include "src/version.h"
 #include "src/io.h"
 #include "src/macros.h"
+#include "src/io.h"
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include "eeprom.h"
+#include "event.h"
 
 #define RS485DIR 2
 
@@ -15,7 +17,7 @@
 #define CURVED   0x0000
 #define STRAIGHT 0x8000
 
-#ifndef debug
+#ifndef DEBUG
 XpressNetMasterClass Xnet ;
 #endif
 
@@ -29,7 +31,8 @@ volatile unsigned long long oldState ; // 64 bits
 
 void setPoint( uint16 pointAddress, uint8 state )
 {
-    #ifndef debug
+    setEvent( pointSet ) ;
+    #ifndef DEBUG
     Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                  // BUG needs to be wrapper function, no acces to Xnet object here
     delay(20) ;
     Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
@@ -38,8 +41,10 @@ void setPoint( uint16 pointAddress, uint8 state )
 
 void setFunc( uint8 val )
 {
-   // static uint16_t eeAddress = 0 ; 
-   // pinMode(A7, INPUT) ;  
+    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+    passPoint( (Address+1) | (data<<15) ) ;
+}
+
 
    // EEPROM.write( eeAddress++, val ) ;
 }
@@ -137,43 +142,91 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( A
 // }
 void setup()
 {
+    uint16_t eeAddress = 0 ;
+    setMode( idling ) ;
 
-    initIO() ; 
+    // EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ; this seems to work well
+    // EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 4   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 5   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 6   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 7   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 8   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 9   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 10  ) ; eeAddress++ ;
 
-    for (int i = 0; i < 10; i++)
-    {
-            digitalWrite( led, HIGH ) ;
-    delay(100);
-    digitalWrite( led,LOW ) ;
-    delay(100);
-    }
-    
+    // EEPROM.put( eeAddress++, STRAIGHT | 1   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 2   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 3   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 4   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, STRAIGHT | 5   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 6   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 7   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 8   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 9   ) ; eeAddress++ ;
+    // EEPROM.put( eeAddress++, CURVED   | 10  ) ; eeAddress++ ;
 
+    // points[ 0 ] = CURVED   | 1 ;
+    // points[ 1 ] = CURVED   | 2 ;
+    // points[ 2 ] = CURVED   | 3 ;
+    // points[ 3 ] = CURVED   | 4 ;
+    // points[ 4 ] = CURVED   | 5 ;
+    // points[ 5 ] = STRAIGHT | 6 ;
+    // points[ 6 ] = STRAIGHT | 7 ;
+    // points[ 7 ] = STRAIGHT | 8 ;
+    // points[ 8 ] = STRAIGHT | 9 ;
+    // points[ 9 ] = STRAIGHT | 10 ;
 
-    #ifndef debug
+    // points[ 10 ] = 0xFFFF ;
+    initIO() ;
+
+    #ifndef DEBUG
     Xnet.setup( Loco28, RS485DIR ) ;
     //beginEeprom() ;
     #else
     Serial.begin( 115200 ) ;
-    for( uint16 i = 0 ; i < 100 ; i ++ )
+    //uint16 eeAddress = 0 ;
+    for( uint16 i = 32 ; i < 64 ; i ++ )
     {
       
-        uint8 a = EEPROM.read( eeAddress1 ++ ) ;
-        uint8 b = EEPROM.read( eeAddress1 ++ ) ;
-        uint8 c = EEPROM.read( eeAddress1 ++ ) ;
+        uint8 a = EEPROM.read( i ++ ) ;
+        uint8 b = EEPROM.read( i ++ ) ;
+        // uint8 c = EEPROM.read( eeAddress ++ ) ;
         // uint8 d = EEPROM.read( eeAddress ++ ) ;
-        Serial.print( a ) ; Serial.print("   "); Serial.print( b ) ; Serial.print("   "); Serial.println( c ) ;//  Serial.print("   "); Serial.println( d ) ;
-        
+        Serial.print("address "); Serial.print( i );Serial.print("   "); Serial.println( (uint16)(a << 8) | b ) ; //Serial.print("   "); Serial.println( b ) ;// Serial.print("   "); Serial.print( c ) ;  Serial.print("   "); Serial.println( d ) ;
     }
-    while(1);
     #endif
 }
+#ifdef DEBUG
+void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
+{
+    if( Serial.available() > 0)
+    {
+        uint16 recv = 0 ;
+
+        delay( 1500 ) ;                                                            // some time to receive more bytes
+        while( Serial.available() > 0 )
+        {
+            recv *= 10 ;
+            recv += ( Serial.read() - '0' ) ;
+        }
+        uint16 address = recv / 10 ;
+        uint16   state = recv % 10 ;
+
+        passPoint( address | (state << 15) ) ;        
+    }
+}
+#endif
 
 void loop()
 {
+    handlePoints() ;
+    eventHandler() ;
 
-    #ifndef debug
+    #ifndef DEBUG
     Xnet.update() ;
-    //handlePoints() ;
+    #else
+    readSerialBus() ;
     #endif
 }
