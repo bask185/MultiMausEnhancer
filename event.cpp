@@ -82,6 +82,6 @@ void setEvent( uint8 _event )
         case enteringTeachin:   flash( yellow          , 3, SLOW ) ; break ;
         case indexReceived:     flash( yellow          , 1, SLOW ) ; break ; 
         case leavingTeachin:    flash( yellow          , 3, SLOW ) ; break ;
-        case pointAdded:        flash( yellow          , 5, FAST ) ; break ;
+        case pointAdded:        flash( yellow          , 3, FAST ) ; break ;
     }
 }
