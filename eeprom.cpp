@@ -4,6 +4,7 @@
 #include "src/stateMachineClass.h"
 #include "src/XpressNetMaster.h"
 
+extern void message( String mess, int val1, int val2 ) ;
 
 const int nPointsPerStreet = 16 ;
 const int nStreets = 16 ;
@@ -52,8 +53,7 @@ void passPoint( uint16 _address )
     newRaw     = _address ;
     newAddress = newRaw & 0x3FFF ;
     newState   = newRaw >> 15 ;
-    debug("new address = "); debugNumber(newAddress); 
-    debug(" new state "); debugNumberln( newState ) ;
+    message( "passed points",  newAddress,  newState ) ;
     pointReceived = true ;
 }
 
@@ -67,7 +67,7 @@ StateFunction( IDLE )
     if( sm.entryState() )
     {
         newAddress = oldAddress = 9999 ;
-        debug("IDLE") ;
+        message( "IDLE",  0,  0 ) ;
 
         setMode( idling ) ;
     }
@@ -95,8 +95,7 @@ StateFunction( settingStreet )
 
         EEPROM.get( eeAddress, points ) ;                                       // load array from EEPROM
         pointIndex = 0 ; 
-        debug("setting street: ") ;  debugNumberln( streetIndex ) ;    
-        debug("eeprom address = ") ; debugNumberln( eeAddress ) ;    
+        message( "setting streed index/eeAddress",  streetIndex,  eeAddress ) ;
 
         setMode( settingPoints ) ;
     }
@@ -116,7 +115,6 @@ StateFunction( settingStreet )
             else                                                                // otherwise set the point
             {
                 setPoint( pointAddress, state ) ;
-                debug("setting point ") ; debugNumber( pointAddress ) ; if( state ) debugln(" curved") else debugln(" straight") 
             }
         }
     }

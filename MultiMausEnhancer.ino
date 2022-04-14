@@ -40,15 +40,16 @@ void message( String mess, int val1, int val2 )
 
 void setPoint( uint16 pointAddress, uint8 state )
 {
-    setEvent( pointSet ) ;
-    Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                  // BUG needs to be wrapper function, no acces to Xnet object here
+    message("Xnet Point set:", pointAddress, state ) ;
+    //setEvent( pointSet ) ;
+    Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                             // BUG needs to be wrapper function, no acces to Xnet object here
     POINT_DELAY( 20 ) ;
     Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
 }
 
 // void setFunc( uint8 val )
 // {
-//     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+//     pinMode(A7, INPUT) ;                                                     // desperate method to prevent linker from optimizing this function away.
 //     passPoint( (Address+1) | (data<<15) ) ;
 // }
 
@@ -60,9 +61,9 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
   //  static uint8 counter = 0 ;
     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
     
-    if (bitRead(data,3) == 0x01)
+    if( bitRead(data,3) == 0x01 )
     { 
-        pinMode(A7, INPUT) ; 
+        pinMode( A7, INPUT ) ; 
 
         data &= 0x1 ;                                                           // clears all but last bit
 
@@ -71,7 +72,7 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 
         passPoint( Address | (data<<15) ) ;
 
-        message( "Point ", Address, data ) ;
+        message( "Xnet Point received", Address, data ) ;
     }
 }
 
@@ -152,8 +153,10 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( A
 
 void notifyXNetPower(uint8_t State)
 {
-    if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ debugPort.println("POWER ON") ; }
-    else                    { /*digitalWrite(led,  LOW);*/ debugPort.println("POWER OFF") ; }
+
+    message("POWER", State , 0xFF ) ;
+    if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ }
+    else                    { /*digitalWrite(led,  LOW);*/ }
 }
 void setup()
 {
@@ -173,7 +176,7 @@ void readSerialBus()                                                            
     {
         uint16 recv = 0 ;
 
-        POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes, also updates Xnet
+        POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes,  updates Xnet in the meantime
         while( debugPort.available() > 0 )
         {
             recv *= 10 ;
@@ -182,7 +185,9 @@ void readSerialBus()                                                            
         uint16 address = recv / 10 ;
         uint16   state = recv % 10 ;
 
-        passPoint( address | (state << 15) ) ;        
+        passPoint( address | (state << 15) ) ;    
+
+        message( "Point ", address, state ) ;    
     }
 }
 
