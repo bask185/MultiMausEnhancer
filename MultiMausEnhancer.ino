@@ -4,8 +4,11 @@
 #include "src/io.h"
 #include "src/XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
+#include <SoftwareSerial.h>
 #include "eeprom.h"
 #include "event.h"
+
+SoftwareSerial debugPort(3,4) ;
 
 #define RS485DIR 2
 
@@ -17,10 +20,10 @@
 #define CURVED   0x0000
 #define STRAIGHT 0x8000
 
-#ifndef DEBUG
-XpressNetMasterClass Xnet ;
-#endif
+#define POINT_DELAY( interval ) uint32_t prevTime = millis() ; \
+                                while( millis() - prevTime <= interval ) { Xnet.update(); }
 
+XpressNetMasterClass Xnet ;
 
 uint8   knob ;
 
@@ -28,48 +31,50 @@ uint16 eeAddress1  = 0 ;
 
 volatile unsigned long long oldState ; // 64 bits
 
+void message( String mess, int val1, int val2 )
+{
+    debugPort.print( mess ) ; debugPort.write(' ') ;
+    debugPort.print( val1 ) ; debugPort.write(' ') ;
+    debugPort.println( val2 ) ;
+}
 
 void setPoint( uint16 pointAddress, uint8 state )
 {
     setEvent( pointSet ) ;
-    #ifndef DEBUG
     Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                  // BUG needs to be wrapper function, no acces to Xnet object here
-    delay(20) ;
+    POINT_DELAY( 20 ) ;
     Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
-    #endif
 }
 
-void setFunc( uint8 val )
-{
-    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
-    passPoint( (Address+1) | (data<<15) ) ;
-}
+// void setFunc( uint8 val )
+// {
+//     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+//     passPoint( (Address+1) | (data<<15) ) ;
+// }
 
 
    // EEPROM.write( eeAddress++, val ) ;
-}
-// void notifyXNetTrnt(uint16_t Address, uint8_t data)
-// {
-//   //  static uint8 counter = 0 ;
-//   //  pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
-//  //   Address ++;
+
+void notifyXNetTrnt(uint16_t Address, uint8_t data)
+{
+  //  static uint8 counter = 0 ;
+    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
     
-//     if (bitRead(data,3) == 0x01)
-//     { 
-//         if( data & 0x01 ) digitalWrite( led, HIGH ) ;
-//         else              digitalWrite( led,  LOW ) ;
-//     }// passPoint( Address | (data<<15) ) ;
+    if (bitRead(data,3) == 0x01)
+    { 
+        pinMode(A7, INPUT) ; 
 
+        data &= 0x1 ;                                                           // clears all but last bit
 
-//         //setFunc( counter ++ ) ;
-//         //setFunc( Address & 0xFF ) ;
-//         //setFunc( data ) ;
-//     // EEPROM.write( eeAddress1++, eeAddress1 ) ;
-//     // EEPROM.write( eeAddress1++, Address ) ;
-//     // EEPROM.write( eeAddress1++, data ) ;
+        if( data & 0x01 ) { /*digitalWrite( led, HIGH ) ;*/ }
+        else              { /*digitalWrite( led,  LOW ) ;*/ }
 
-// }
-/*
+        passPoint( Address | (data<<15) ) ;
+
+        message( "Point ", Address, data ) ;
+    }
+}
+
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
     static uint8 state = 0 , prevKnob = 0xFF ;
@@ -85,13 +90,23 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     else if(    speed >   -20 && speed <  20 ) knob = 2 ;
     else if(    speed <=  100 && speed >  20 ) knob = 1 ;
     else if(    speed >   100                ) knob = 0 ;
+
+    if( knob != prevKnob )
+    {
+        prevKnob = knob ;
+        message("knob ", knob, Speed ) ;
+    }
 }
-*/
+
 
 
 void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
 {
-    if( Address != 1) return ;
+    if( Address != 1)
+    {
+        message("wrong address, ignoring function", Address, func ) ;
+        return ;
+    }
 
     volatile static uint8 prevState[4];
     volatile uint8  fKey ;
@@ -120,10 +135,10 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is veriv
 
             uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
 
+            message("point set:", pointNumber, state ) ;
+            message("Fkey & bank", fKey, bank ) ;
+
             setPoint( pointNumber, state ) ;
-            
-            //setFunc( fKey ) ;                                                 // VERIVIED
-            //setFunc( state ) ;                                                // VERIVIED
             return ;
         }
     }
@@ -135,81 +150,34 @@ void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( A
 void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
 
 
-// void notifyXNetPower(uint8_t State)
-// {
-//     if( State == csNormal ) digitalWrite(led, HIGH);
-//     else                    digitalWrite(led,  LOW);
-// }
+void notifyXNetPower(uint8_t State)
+{
+    if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ debugPort.println("POWER ON") ; }
+    else                    { /*digitalWrite(led,  LOW);*/ debugPort.println("POWER OFF") ; }
+}
 void setup()
 {
     uint16_t eeAddress = 0 ;
     setMode( idling ) ;
 
-    // EEPROM.put( eeAddress++, CURVED   | 1   ) ; eeAddress++ ; this seems to work well
-    // EEPROM.put( eeAddress++, CURVED   | 2   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 3   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 4   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 5   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 6   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 7   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 8   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 9   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 10  ) ; eeAddress++ ;
 
-    // EEPROM.put( eeAddress++, STRAIGHT | 1   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 2   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 3   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 4   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, STRAIGHT | 5   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 6   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 7   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 8   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 9   ) ; eeAddress++ ;
-    // EEPROM.put( eeAddress++, CURVED   | 10  ) ; eeAddress++ ;
-
-    // points[ 0 ] = CURVED   | 1 ;
-    // points[ 1 ] = CURVED   | 2 ;
-    // points[ 2 ] = CURVED   | 3 ;
-    // points[ 3 ] = CURVED   | 4 ;
-    // points[ 4 ] = CURVED   | 5 ;
-    // points[ 5 ] = STRAIGHT | 6 ;
-    // points[ 6 ] = STRAIGHT | 7 ;
-    // points[ 7 ] = STRAIGHT | 8 ;
-    // points[ 8 ] = STRAIGHT | 9 ;
-    // points[ 9 ] = STRAIGHT | 10 ;
-
-    // points[ 10 ] = 0xFFFF ;
     initIO() ;
 
-    #ifndef DEBUG
     Xnet.setup( Loco28, RS485DIR ) ;
-    //beginEeprom() ;
-    #else
-    Serial.begin( 115200 ) ;
-    //uint16 eeAddress = 0 ;
-    for( uint16 i = 32 ; i < 64 ; i ++ )
-    {
-      
-        uint8 a = EEPROM.read( i ++ ) ;
-        uint8 b = EEPROM.read( i ++ ) ;
-        // uint8 c = EEPROM.read( eeAddress ++ ) ;
-        // uint8 d = EEPROM.read( eeAddress ++ ) ;
-        Serial.print("address "); Serial.print( i );Serial.print("   "); Serial.println( (uint16)(a << 8) | b ) ; //Serial.print("   "); Serial.println( b ) ;// Serial.print("   "); Serial.print( c ) ;  Serial.print("   "); Serial.println( d ) ;
-    }
-    #endif
+    debugPort.begin( 9600 ) ;   
 }
-#ifdef DEBUG
+
 void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
 {
-    if( Serial.available() > 0)
+    if( debugPort.available() > 0)
     {
         uint16 recv = 0 ;
 
-        delay( 1500 ) ;                                                            // some time to receive more bytes
-        while( Serial.available() > 0 )
+        POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes, also updates Xnet
+        while( debugPort.available() > 0 )
         {
             recv *= 10 ;
-            recv += ( Serial.read() - '0' ) ;
+            recv += ( debugPort.read() - '0' ) ;
         }
         uint16 address = recv / 10 ;
         uint16   state = recv % 10 ;
@@ -217,16 +185,13 @@ void readSerialBus()                                                            
         passPoint( address | (state << 15) ) ;        
     }
 }
-#endif
+
 
 void loop()
 {
     handlePoints() ;
-    eventHandler() ;
+    //eventHandler() ;
 
-    #ifndef DEBUG
     Xnet.update() ;
-    #else
     readSerialBus() ;
-    #endif
 }

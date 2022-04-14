@@ -31,7 +31,7 @@
 #include "XpressNetMaster.h"
 
 
-#ifndef DEBUG
+//#ifndef DEBUG
 
 #if defined(__AVR__)
 #include <avr/interrupt.h>
@@ -1394,4 +1394,4 @@ void XpressNetMasterClass::XNetRXclear(uint8_t b)
 }
 
 
-#endif
+// #endif
