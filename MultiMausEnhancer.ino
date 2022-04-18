@@ -2,7 +2,7 @@
 #include "src/io.h"
 #include "src/macros.h"
 #include "src/io.h"
-#include "src/XpressNetMaster.h"
+#include "XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include <SoftwareSerial.h>
 #include "eeprom.h"
@@ -25,6 +25,8 @@ SoftwareSerial debugPort(3,4) ;
 
 XpressNetMasterClass Xnet ;
 
+bool    dirChange = 1 ;
+uint8   setSpeed ;
 uint8   knob ;
 
 uint16 eeAddress1  = 0 ;
@@ -47,6 +49,11 @@ void setPoint( uint16 pointAddress, uint8 state )
     Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
 }
 
+// void notifyXNetFeedback(uint16_t Address, uint8_t data)
+// {
+//     //message("feedback", Address, data) ;
+// }
+
 // void setFunc( uint8 val )
 // {
 //     pinMode(A7, INPUT) ;                                                     // desperate method to prevent linker from optimizing this function away.
@@ -56,20 +63,31 @@ void setPoint( uint16 pointAddress, uint8 state )
 
    // EEPROM.write( eeAddress++, val ) ;
 
-void notifyXNetTrnt(uint16_t Address, uint8_t data)
-{
-  //  static uint8 counter = 0 ;
-    pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
+// void notifyXNetTrnt(uint16_t Address, uint8_t data)
+// {
+//   //  static uint8 counter = 0 ;
+//     pinMode(A7, INPUT) ;                                                        // desperate method to prevent linker from optimizing this function away.
     
-    if( bitRead(data,3) == 0x01 )
+//     if( bitRead(data,3) == 0x01 )
+//     { 
+//         pinMode( A7, INPUT ) ; 
+
+//         data &= 0x1 ;                                                           // clears all but last bit
+
+//         if( data & 0x01 ) { /*digitalWrite( led, HIGH ) ;*/ }
+//         else              { /*digitalWrite( led,  LOW ) ;*/ }
+
+//         passPoint( Address | (data<<15) ) ;
+
+//         message( "Xnet Point received", Address, data ) ;
+//     }
+// }
+
+void notifyXNetTrnt(uint16_t Address, uint8_t data) 
+{
+    if( bitRead(data,3) == 1 )
     { 
-        pinMode( A7, INPUT ) ; 
-
-        data &= 0x1 ;                                                           // clears all but last bit
-
-        if( data & 0x01 ) { /*digitalWrite( led, HIGH ) ;*/ }
-        else              { /*digitalWrite( led,  LOW ) ;*/ }
-
+        data &= 0x1 ;
         passPoint( Address | (data<<15) ) ;
 
         message( "Xnet Point received", Address, data ) ;
@@ -78,6 +96,8 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
 {
+    //return ; // DELETE ME
+
     static uint8 state = 0 , prevKnob = 0xFF ;
     int8_t speed ;
 
@@ -96,6 +116,11 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     {
         prevKnob = knob ;
         message("knob ", knob, Speed ) ;
+    }
+
+    if( Address == 6 )
+    {
+        setSpeed = Speed ;
     }
 }
 
@@ -137,7 +162,7 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is veriv
             uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
 
             message("point set:", pointNumber, state ) ;
-            message("Fkey & bank", fKey, bank ) ;
+            //message("Fkey & bank", fKey, bank ) ;
 
             setPoint( pointNumber, state ) ;
             return ;
@@ -147,7 +172,7 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is veriv
 
 void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { functionPressed( Address, Func1,   F0_F4 ) ; } //              F0  F4  F3  F2  F1
 void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { functionPressed( Address, Func2,   F5_F8 ) ; } //                  F8  F7  F6  F5
-void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( Address, Func3,  F9_F12 ) ; } //                 F12 F11 F10  F9
+void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { dirChange ^= 1 ; functionPressed( Address, Func3,  F9_F12 ) ; } //                 F12 F11 F10  F9
 void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
 
 
@@ -155,8 +180,8 @@ void notifyXNetPower(uint8_t State)
 {
 
     message("POWER", State , 0xFF ) ;
-    if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ }
-    else                    { /*digitalWrite(led,  LOW);*/ }
+    //if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ }
+    //else                    { /*digitalWrite(led,  LOW);*/ }
 }
 void setup()
 {
@@ -164,31 +189,32 @@ void setup()
     setMode( idling ) ;
 
 
-    initIO() ;
+    //initIO() ;
 
-    Xnet.setup( Loco28, RS485DIR ) ;
+    Xnet.setup( Loco28,  2) ;
     debugPort.begin( 9600 ) ;   
+    message("multimause enhancer booted",3,5);
 }
 
 void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
 {
-    if( debugPort.available() > 0)
-    {
-        uint16 recv = 0 ;
+    // if( debugPort.available() > 0)
+    // {
+    //     uint16 recv = 0 ;
 
-        POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes,  updates Xnet in the meantime
-        while( debugPort.available() > 0 )
-        {
-            recv *= 10 ;
-            recv += ( debugPort.read() - '0' ) ;
-        }
-        uint16 address = recv / 10 ;
-        uint16   state = recv % 10 ;
+    //     POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes,  updates Xnet in the meantime
+    //     while( debugPort.available() > 0 )
+    //     {
+    //         recv *= 10 ;
+    //         recv += ( debugPort.read() - '0' ) ;
+    //     }
+    //     uint16 address = recv / 10 ;
+    //     uint16   state = recv % 10 ;
 
-        passPoint( address | (state << 15) ) ;    
+    //     passPoint( address | (state << 15) ) ;    
 
-        message( "Point ", address, state ) ;    
-    }
+    //     message( "Point ", address, state ) ;    
+    // }
 }
 
 
@@ -198,5 +224,18 @@ void loop()
     //eventHandler() ;
 
     Xnet.update() ;
-    readSerialBus() ;
+    //readSerialBus() ;
+
+    REPEAT_MS( 200 )
+    {
+        static uint8 prevSpeed = 0 ;
+        if( prevSpeed != setSpeed )
+        {   prevSpeed  = setSpeed ;
+
+            int8 speedTemp = setSpeed ;
+            Xnet.setSpeed( 7, Loco128, speedTemp ) ;
+            Xnet.setSpeed( 12, Loco128, speedTemp ) ;
+        }
+    } END_REPEAT
+
 }
