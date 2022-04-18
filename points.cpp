@@ -1,4 +1,4 @@
-#include "eeprom.h"
+#include "points.h"
 #include "event.h"
 #include <EEPROM.h>
 #include "src/stateMachineClass.h"
@@ -34,7 +34,7 @@ void passPoint( uint16 _address )
     newRaw     = _address ;
     newAddress = newRaw & 0x3FFF ;
     newState   = newRaw >> 15 ;
-    message( "passed points",  newAddress,  newState ) ;
+    message( F("passed points"),  newAddress,  newState ) ;
     pointReceived = true ;
 }
 
@@ -48,9 +48,9 @@ StateFunction( IDLE )
     if( sm.entryState() )
     {
         newAddress = oldAddress = 9999 ;
-        message( "IDLE",  0,  0 ) ;
+        message( F("IDLE"),  0,  0 ) ;
 
-        setMode( idling ) ;
+        // setMode( idling ) ;
     }
     if( sm.onState() )
     {
@@ -76,9 +76,9 @@ StateFunction( settingStreet )
 
         EEPROM.get( eeAddress, points ) ;                                       // load array from EEPROM
         pointIndex = 0 ; 
-        message( "setting street index/eeAddress",  streetIndex,  eeAddress ) ;
+        message( F("setting street index/eeAddress"),  streetIndex,  eeAddress ) ;
 
-        setMode( settingPoints ) ;
+        // setMode( settingPoints ) ;
     }
     if( sm.onState() )
     {
@@ -101,8 +101,8 @@ StateFunction( settingStreet )
     }
     if( sm.exitState() )
     {
-        if( pointIndex == nPointsPerStreet )  message("max points reached",nPointsPerStreet,0);
-        else                                  message("invalid address",0,0);
+        if( pointIndex == nPointsPerStreet )  message(F("max points reached"),nPointsPerStreet,0);
+        else                                  message(F("invalid address"),0,0);
 
         
     }
@@ -113,8 +113,8 @@ StateFunction( getIndex )
 {
     if( sm.entryState() )
     {
-        setEvent( enteringTeachin ) ;
-        message("getting street index for teaching in points",0,0) ;
+        // setEvent( enteringTeachin ) ;
+        message(F("getting street index for teaching in points"),0,0) ;
     }
     if( sm.onState() )
     {
@@ -131,14 +131,14 @@ StateFunction( getIndex )
         uint16 beginAddress = streetIndex  *  nPointsPerStreet * 2  ;           
         uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;
 
-        message("received index = ",streetIndex,0); 
-        message("clearing street from/to: ",beginAddress,endAddress);
+        message(F("received index = "),streetIndex,0); 
+        message(F("clearing street from/to: "),beginAddress,endAddress);
 
         for ( uint16 address = beginAddress ; address < endAddress ; address++ ) 
         {
             EEPROM.write( address, 0xFF ) ;
         }  
-        setEvent( indexReceived ) ;
+        // setEvent( indexReceived ) ;
     }
 
     return sm.endState() ;
@@ -157,9 +157,9 @@ StateFunction( addPoints )
         pointReceived = false ;
         pointIndex = -1 ;
         oldAddress = newAddress = 9999 ;
-        message("adding points",0,0);
+        message(F("adding points"),0,0);
 
-        setMode( teachin ) ;
+        // setMode( teachin ) ;
     }
     if( sm.onState() )
     {
@@ -170,7 +170,7 @@ StateFunction( addPoints )
             {   oldAddress  = newAddress ;
                 
                 pointIndex ++ ;
-                message("new address, index = ",newAddress, pointIndex) ;
+                message(F("new address, index = "),newAddress, pointIndex) ;
             }
 
             if( pointIndex == nPointsPerStreet                                  // if we added max amount of points FIXME
@@ -182,25 +182,25 @@ StateFunction( addPoints )
             {
                 if( newAddress >= baseAddress )
                 {
-                    message("invalid address ",newAddress, newState) ;
+                    message(F("invalid address "),newAddress, newState) ;
                 }
                 else
                 {
                     uint16 eeAddress = streetIndex * nPointsPerStreet * 2 + (pointIndex*2); 
                     EEPROM.put(eeAddress, newAddress | (newState<<15)) ;            // otherwise store the point
 
-                    message("storing point: ",newAddress, newState) ;
-                    setEvent( pointAdded ) ;
+                    message(F("storing point: "),newAddress, newState) ;
+                    // setEvent( pointAdded ) ;
                 }
             }
         }
     }
     if( sm.exitState() )
     {
-        if( pointIndex == nPointsPerStreet ) message("maximum amount of points added",0,0) ;
-        else                                 message("base address received, all points saved",0,0) ;
+        if( pointIndex == nPointsPerStreet ) message(F("maximum amount of points added"),0,0) ;
+        else                                 message(F("base address received, all points saved"),0,0) ;
 
-        setEvent( leavingTeachin ) ;
+        // setEvent( leavingTeachin ) ;
     }
     return sm.endState() ;
 }
