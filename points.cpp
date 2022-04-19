@@ -71,7 +71,7 @@ StateFunction( settingStreet )
 {
     if( sm.entryState() )
     {
-        streetIndex = newAddress - baseAddress ;
+        streetIndex = newAddress - baseAddress - 1 ;
         uint16 eeAddress = streetIndex * nPointsPerStreet * 2 ;                 // calculate address
 
         EEPROM.get( eeAddress, points ) ;                                       // load array from EEPROM
@@ -126,7 +126,7 @@ StateFunction( getIndex )
     }
     if( sm.exitState() )
     {
-        streetIndex = newAddress - baseAddress ;                                // calculate street index and whipe matching part in EEPROM
+        streetIndex = newAddress - baseAddress - 1 ;                                // calculate street index and whipe matching part in EEPROM
 
         uint16 beginAddress = streetIndex  *  nPointsPerStreet * 2  ;           
         uint16 endAddress   = beginAddress + (nPointsPerStreet * 2) ;

@@ -62,9 +62,9 @@ void setPoint( uint16 pointAddress, uint8 state )
 {
     // message(F("Xnet Point set:"), pointAddress, state ) ;                    // works fine
     //setEvent( pointSet ) ;
-    Xnet.SetTrntPos( pointAddress - 1, state, 1 ) ;                             // BUG needs to be wrapper function, no acces to Xnet object here
+    Xnet.SetTrntPos( pointAddress, state, 1 ) ;                             // BUG needs to be wrapper function, no acces to Xnet object here
     POINT_DELAY( 20 ) ;
-    Xnet.SetTrntPos( pointAddress - 1, state, 0 ) ;
+    Xnet.SetTrntPos( pointAddress, state, 0 ) ;
 }
 
 // void notifyXNetFeedback(uint16_t Address, uint8_t data)                      // to be used for future debugging
