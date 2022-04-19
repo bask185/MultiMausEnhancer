@@ -25,10 +25,14 @@ void storeEvent( uint8 type, uint16 address, uint8 data )
 
 	switch( type )		// show message of what is being stored
 	{
-		case event_speed: 	message(F("storing speed event"), address, data ) ; break ;
-		case event_point: 	message(F("storing point event"), address, data ) ; break ;
-		case event_start:	message(F("storing start event"), 0, 0 			) ; break ;
-		case event_stop: 	message(F("storing stop event" ), 0, 0 			) ; break ;
+		case event_speed: 		message(F("storing speed"),   address, data ) ; break ;
+		case event_point: 		message(F("storing point"),   address, data ) ; break ;
+		case event_start:		message(F("storing start"),   0, 0 			) ; break ;
+		case event_stop: 		message(F("storing stop" ),   0, 0 			) ; break ;
+		case event_F0_F4:		message(F("storing F0-F4"),   address, data ) ; break ;
+		case event_F5_F8:		message(F("storing F5-F8"),   address, data ) ; break ;
+		case event_F9_F12:		message(F("storing F9-F12"),  address, data	) ; break ;
+		case event_F13_F20:		message(F("storing F13-F20"), address, data	) ; break ;
 	}
 
 	localEvent.type = type ;

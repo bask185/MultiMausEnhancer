@@ -126,11 +126,20 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
 
 
 
-void functionPressed ( uint16 Address, uint8 func, uint8 bank ) // bank is verivied, address is verivied, Address is verivied
+void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 // bank is verivied, address is verivied, Address is verivied
 {
     if( Address != 1)
     {
-        message(F("wrong address, ignoring function"), Address, func ) ;
+        if( recordingDevice == recording )
+        {
+            switch( bank )
+            {
+            case    F0_F4: storeEvent(   event_F0_F4, Address, func ) ; break ;
+            case    F5_F8: storeEvent(   event_F5_F8, Address, func ) ; break ;
+            case   F9_F12: storeEvent(  event_F9_F12, Address, func ) ; break ;
+            case  F13_F20: storeEvent( event_F13_F20, Address, func ) ; break ;
+            }
+        }
         return ;
     }
 
@@ -224,43 +233,27 @@ void loop()
 
     if( recordingDevice == playing && (currTime - prevTime) >= nextInterval )
     {
-        //message(F("loading next event"), 0, 0 ) ; works fine
-
         switch( event.type )
         {
-        case event_start:
-            message(F("start event received"), 0, 0 ) ;
-            break ;
-
+        case event_start:    message(F("player: started"), 0, 0 ) ; break ;
+        case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
+        case event_F0_F4 :   message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
+        case event_F5_F8 :   message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
+        case event_F9_F12 :  message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
+        case event_F13_F20 : message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
+        case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ; 
         case event_stop:
-            message(F("stop event received"), 0, 0 ) ;
-            if( playingAllowed == false ) recordingDevice = idle ;    // after stop is received, check if program may replay or not..
-            else                          startPlaying() ;
-            break ;
+            if( playingAllowed == false ) {
+                             message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
+            else {           message(F("player: program resetting"), 0, 0 ) ;                   startPlaying() ;         }                           break ;
 
-        case event_speed:
-            Xnet.setSpeed( event.address, Loco128, event.data ) ;
-            message(F("player: setting loco speed"), event.address, event.data ) ;
-            break ;
-
-        case event_F0_F4 :   break ;                                    // to be added...
-        case event_F5_F8 :   break ;
-        case event_F9_F12 :  break ;
-        case event_F13_F20 : break ;
-
-        case event_point:
-            message(F("player: setting point"), event.address, event.data ) ;
-            setPoint( event.address, event.data ) ;
-            break ;
         }
 
         prevTime = currTime ;
         event = getEvent() ;     
-        nextInterval = event.time2nextEvent ;                           // load timer to next event ;
-        message(F("next event"), event.type, nextInterval ) ;
+        nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
+        message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
     }
-
-
 
     handlePoints() ;
     //eventHandler() ;
