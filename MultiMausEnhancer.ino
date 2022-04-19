@@ -2,6 +2,7 @@
 #include "src/io.h"
 #include "src/macros.h"
 #include "src/io.h"
+#include "src/debounceClass.h"
 #include "XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include <SoftwareSerial.h>
@@ -10,6 +11,7 @@
 #include "event.h"
 
 SoftwareSerial debugPort(3,4) ;
+Debounce sensor( 5 ) ;
 
 #define RS485DIR 2
 
@@ -26,8 +28,10 @@ SoftwareSerial debugPort(3,4) ;
 
 XpressNetMasterClass Xnet ;
 
+
 uint8   setSpeed ;
 uint8   knob ;
+uint8   newSensor ;
 
 
 /****** recording / playing programs *******/
@@ -229,19 +233,43 @@ void readSerialBus()                                                            
 
 void loop()
 {
+    REPEAT_MS( 20 )
+    {
+        sensor.debounce() ;
+
+    } END_REPEAT ;
+
+    if( sensor.getState() == FALLING )
+    {
+        if( recordingDevice == recording )
+        {
+            storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing
+        }
+        else if( recordingDevice == playing )
+        {
+            newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
+        }
+    }
+
     uint32 currTime = millis() ;
 
     if( recordingDevice == playing && (currTime - prevTime) >= nextInterval )
     {
+        if( nextInterval == 0 ) // if interval is 0, we are waiting on a sensor or feedback thing to continu.
+        {
+            if( newSensor == event.address ) nextInterval = 1 ;
+            return ;
+        }
         switch( event.type )
         {
         case event_start:    message(F("player: started"), 0, 0 ) ; break ;
         case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
-        case event_F0_F4 :   message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
-        case event_F5_F8 :   message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
-        case event_F9_F12 :  message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
-        case event_F13_F20 : message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
-        case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ; 
+        case event_F0_F4:    message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
+        case event_F5_F8:    message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
+        case event_F9_F12:   message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
+        case event_F13_F20:  message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
+        case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ;
+        case event_feedback: message(F("player: feedback"),      event.address, event.data ) ;                                                       break ;
         case event_stop:
             if( playingAllowed == false ) {
                              message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
@@ -252,25 +280,12 @@ void loop()
         prevTime = currTime ;
         event = getEvent() ;     
         nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
+        newSensor = 0 ;
         message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
     }
 
     handlePoints() ;
-    //eventHandler() ;
+    //eventHandler() ;                                                          // handles LED to give status indictation
 
     Xnet.update() ;
-    //readSerialBus() ;
-
-    // REPEAT_MS( 200 )                                         // this for traction, should be moved to EEPROM with control functions and all...
-    // {
-    //     static uint8 prevSpeed = 0 ;
-    //     if( prevSpeed != setSpeed )
-    //     {   prevSpeed  = setSpeed ;
-
-    //         int8 speedTemp = setSpeed ;
-    //         Xnet.setSpeed( 7, Loco128, speedTemp ) ;
-    //         Xnet.setSpeed( 12, Loco128, speedTemp ) ;
-    //     }
-    // } END_REPEAT
-
 }
