@@ -19,10 +19,6 @@
 
 // void flash( uint8 _leds, uint8 blinks, uint16 _blinkSpeed )
 // {
-//     digitalWrite(  greenLed, LOW ) ;
-//     digitalWrite( yellowLed, LOW ) ;
-//     digitalWrite(    redLed, LOW ) ;
-
 //     blinkCounter = 0 ;
 //     blinkSpeed = _blinkSpeed ;
 //     nBlinks = blinks * 2 ;
@@ -30,7 +26,7 @@
 //     prevTime = millis() ;
 // }
 
-// void eventHandler()
+// void lightHandler()
 // {
 //     if( event != 0 && (millis() - prevTime > blinkSpeed ) )                             // If event is set, and time is expired, blink led
 //     {
@@ -53,35 +49,60 @@
 
 //     if( event == 0 )
 //     {
-//         if( leds &  green )  { digitalWrite(  greenLed, HIGH ) ; } 
-//         else {                 digitalWrite(  greenLed,  LOW ) ; }
-//         if( leds & yellow )  { digitalWrite( yellowLed, HIGH ) ; } 
-//         else {                 digitalWrite( yellowLed,  LOW ) ; }
-//         if( leds &    red )  { digitalWrite(    redLed, HIGH ) ; } 
-//         else {                 digitalWrite(    redLed,  LOW ) ; }
+//         if( mode == running )
+//         {
+//             digitalWrite(   greenLed, HIGH ) ;
+//             digitalWrite(  yellowLed,  LOW ) ;
+//             digitalWrite(     redLed,  LOW ) ;
+//         }
+//         if( mode == teachin )
+//         {
+//             REPEAT_MS( SLOW )
+//             {
+//                 digitalWrite(   greenLed, LOW ) ;
+//                 digitalWrite(  yellowLed, LOW ) ;
+//                 digitalWrite(     redLed, !digitalRead( redLed ) ) ;
+//             } END_REPEAT
+//         }
+//         if( mode == OFF )
+//         {
+//             digitalWrite(   greenLed,  LOW ) ;
+//             digitalWrite(  yellowLed,  LOW ) ;
+//             digitalWrite(     redLed,  LOW ) ;
+//         }
 //     }
 // }
 
-// void setMode( uint8 _mode )
-// {
-//     leds = 0 ;
-//     switch( _mode )
-//     {
-//         case idling :           flash( red            , 0,   ON ) ; break ;
-//         case teachin :          flash( yellow         , 0,   ON ) ; break ;
-//         case settingPoints :    flash( green          , 0,   ON ) ; break ;
-//     }
-// }
 
-// void setEvent( uint8 _event )
+// void setLights( uint8 event )
 // {
-//     event = _event ;
 //     switch( event )
 //     {
-//         case pointSet:          flash( green | yellow  , 2, FAST ) ; break ;
-//         case enteringTeachin:   flash( yellow          , 3, SLOW ) ; break ;
-//         case indexReceived:     flash( yellow          , 1, SLOW ) ; break ; 
-//         case leavingTeachin:    flash( yellow          , 3, SLOW ) ; break ;
-//         case pointAdded:        flash( yellow          , 3, FAST ) ; break ;
+//         // case runModeEnabled:    flash( green           ,   5, FAST ) ; break ;
+//         // case teachingEnabled:   flash( yellow          ,   5, FAST ) ; break ;
+//         // case turnedOff:         flash( red             ,   5, FAST ) ; break ; 
+//         // case detectorMade:      flash( yellow          ,   3, FAST ) ; break ;
+//         // case trainBraking:      flash( green | red     ,   1, SLOW ) ; break ;
+//         // case trainArrived:      flash( green | red     ,   2, SLOW ) ; break ;
+//         // case trainDeparting:    flash( green | yellow  ,   1, SLOW ) ; break ;
+//         // case trainDeparted:     flash( green | yellow  ,   2, SLOW ) ; break ;
+//         // case trainNotDeparted:  flash( red             ,   5, FAST ) ; break ;
+//         // case slotAdded:         flash( green|yellow|red,   4, FAST ) ; break ;
+//         // case slotNotFound:      flash( red             ,   3, FAST ) ; break ;
+//         // case slotLoaded:        flash( green  | yellow ,   3, FAST ) ; break ;
+//         // case waiting4address:   flash( green  | yellow ,   1, FAST ) ; break ;
+//         // case addressReceived:   flash( green  | yellow ,   2, FAST ) ; break ;
 //     }
 // }
+
+// /*  runModeEnabled,
+//     teachingEnabled,  
+//     detectorMade,           // 3 flashes orange
+//     trainBreaking,          // 1 flashes green
+//     trainArrived,
+//     trainDeparting,         // 2 flashes green
+//     trainNotDeparted,       // 5 flashes red
+//     trainDeparted,          //
+//     slotAdded,              // 5 flashes yellow
+//     slotNotFound,           // 5 flashed red
+//     slotLoaded              // 5 flashes green*/
