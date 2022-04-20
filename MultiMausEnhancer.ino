@@ -67,10 +67,32 @@ void setPoint( uint16 pointAddress, uint8 state )
     Xnet.SetTrntPos( pointAddress, state, 0 ) ;
 }
 
-// void notifyXNetFeedback(uint16_t Address, uint8_t data)                      // to be used for future debugging
-// {
-//     //message("feedback", Address, data) ;
-// }
+void notifyXNetFeedback(uint16_t Address, uint8_t data)                      // to be used for future debugging
+{
+    // ITT N ZZZZ  <-- data
+	// ITT = 010 for feedback modules
+    //message(F( "feedback raw" ), Address, data ) ;
+	if( data & 0b01000000 )
+    {
+        Address &= 0x00FF ; // clear bit 8 for FB module address
+		Address >>= 2 ;
+        Address -= 57 ;
+
+        bool I = bitRead( data, 4 ) ;
+        data &= 0x0F ;
+        if( I ) data <<= 4 ;
+
+        for( int i = 0 ; i < 8 ; i++ )
+        {
+            if( data & ( 1 << i ) )
+            {
+                newSensor = Address + i ;
+                if( recordingDevice == recording ) storeEvent( event_feedback, Address + i, data  ) ;
+                message(F( "storing feedback" ), Address + i, data ) ;
+            }
+        }
+    }
+}
 
 void notifyXNetTrnt(uint16_t Address, uint8_t data) 
 {
@@ -81,7 +103,7 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 
         message(F( "Xnet Point received"), Address, data ) ;
         
-        if(      Address == 997 && data == 0 ) { message(F("playing started"  ), 0, 0 ) ; playingAllowed = true ; startPlaying() ; recordingDevice = playing ; event = getEvent() ; }
+        if(      Address == 997 && data == 0 ) { message(F("playing started"  ), 0, 0 ) ; playingAllowed = true ; startPlaying() ; recordingDevice = playing ; event = getEvent() ; nextInterval = 1 ; }
         else if( Address == 997 && data == 1 ) { message(F("playing stopped"  ), 0, 0 ) ; playingAllowed = false ; }
         else if( Address == 998 && data == 0 ) { message(F("recording started"), 0, 0 ) ; storeEvent( event_start, 0, 0 ) ; recordingDevice = recording ;}
         else if( Address == 998 && data == 1 ) { message(F("recording stopped"), 0, 0 ) ; storeEvent( event_stop,  0, 0 ) ; recordingDevice = idle ; }
@@ -204,9 +226,11 @@ void setup()
 
     //initIO() ;
 
-    Xnet.setup( Loco28,  2) ;
+    Xnet.setup( Loco128,  2) ;
     debugPort.begin( 9600 ) ;   
     message(F("multimause enhancer booted"),3,5);
+
+    Xnet.ReqLocoBusy( 99 ) ;
 }
 
 void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
@@ -257,31 +281,36 @@ void loop()
     {
         if( nextInterval == 0 ) // if interval is 0, we are waiting on a sensor or feedback thing to continu.
         {
-            if( newSensor == event.address ) nextInterval = 1 ;
-            return ;
+            if( newSensor == 1 )
+            {
+                nextInterval = 1 ;
+            }
         }
-        switch( event.type )
+        else 
         {
-        case event_start:    message(F("player: started"), 0, 0 ) ; break ;
-        case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
-        case event_F0_F4:    message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
-        case event_F5_F8:    message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
-        case event_F9_F12:   message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
-        case event_F13_F20:  message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
-        case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ;
-        case event_feedback: message(F("player: feedback"),      event.address, event.data ) ;                                                       break ;
-        case event_stop:
-            if( playingAllowed == false ) {
-                             message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
-            else {           message(F("player: program resetting"), 0, 0 ) ;                   startPlaying() ;         }                           break ;
+            switch( event.type )
+            {
+            case event_start:    message(F("player: started"), 0, 0 ) ; break ;
+            case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
+            case event_F0_F4:    message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
+            case event_F5_F8:    message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
+            case event_F9_F12:   message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
+            case event_F13_F20:  message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
+            case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ;
+            case event_feedback: message(F("player: feedback"),      event.address, event.data ) ;                                                       break ;
+            case event_stop:
+                if( playingAllowed == false ) {
+                                message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
+                else {           message(F("player: program resetting"), 0, 0 ) ;                   startPlaying() ;         }                           break ;
 
+            }
+
+            prevTime = currTime ;
+            event = getEvent() ;     
+            nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
+            newSensor = 0 ;
+            message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
         }
-
-        prevTime = currTime ;
-        event = getEvent() ;     
-        nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
-        newSensor = 0 ;
-        message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
     }
 
     handlePoints() ;
