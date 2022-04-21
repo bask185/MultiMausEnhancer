@@ -67,32 +67,39 @@ void setPoint( uint16 pointAddress, uint8 state )
     Xnet.SetTrntPos( pointAddress, state, 0 ) ;
 }
 
-void notifyXNetFeedback(uint16_t Address, uint8_t data)                      // to be used for future debugging
-{
-    // ITT N ZZZZ  <-- data
-	// ITT = 010 for feedback modules
-    //message(F( "feedback raw" ), Address, data ) ;
-	if( data & 0b01000000 )
-    {
-        Address &= 0x00FF ; // clear bit 8 for FB module address
-		Address >>= 2 ;
-        Address -= 57 ;
+// ITT N ZZZZ
 
-        bool I = bitRead( data, 4 ) ;
-        data &= 0x0F ;
-        if( I ) data <<= 4 ;
+// I   If this bit is 1, the switching command requested has not been completed and the turnout
+// has not reached its end position.
+// For feedback modules this bit will always be 0 because the inputs of these modules can become
+// only be 0 or 1.
+//  TT = 0 0 : Address is accessory decoder without feedback
+//  TT = 0 1 : Address is accessory decoder with feedback
+//  TT = 1 0 : Address is a feedback module
+//  N   This bit describes which nibble of a turnout or feedback module this response describes.
+//  N=0 is the lower nibble, N=1 the upper nibble.
+void notifyXNetFeedback( uint16_t address, uint8_t state )
+{                                        // ITT = 010 for feedback modules
+    message("feedback", Address, state) ;
 
-        for( int i = 0 ; i < 8 ; i++ )
-        {
-            if( data & ( 1 << i ) )
-            {
-                newSensor = Address + i ;
-                if( recordingDevice == recording ) storeEvent( event_feedback, Address + i, data  ) ;
-                message(F( "storing feedback" ), Address + i, data ) ;
-            }
-        }
-    }
+    // if( !(state & 0b1000000) )
+    // {
+    //     //notifyXNetTrnt(address, state + 2 ) ; // DOES GIVE STRANGE ADDRESS AND POS FEEDBACK DECODING IS NEEDED HERE
+    //     return ; // if not feedback module, return here
+    // }
+
+// FOR FEED BACK MODULE
+    state &= 0b00011111 ;
+    static uint8_t counter = 0 ;
+    static uint32_t lastTime = 0 ;
+    uint32_t currentTime = millis () ;
+    //if( (state & 0x0F) == 0) return ;
+
+    lastTime = currentTime ;    // SK: check how this works again
+    address &= 0x00FF ; // clear bit 8 for FB module address 
+    address >>= 2 ;
 }
+
 
 void notifyXNetTrnt(uint16_t Address, uint8_t data) 
 {
@@ -191,7 +198,7 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 
 
             if( fKey == 5 && bank == F0_F4 ) fKey = 0 ;                         // F0 is on the 5th bit
 
-            oldState ^= (1 << fKey );                                           // toggle previous state
+            oldState ^= (1 << fKey );                                           // toggle previous state SK: HOW CAN THIS WORK?
             bool state = oldState >> fKey ;                                     // get state 
 
             uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
@@ -233,50 +240,10 @@ void setup()
     Xnet.ReqLocoBusy( 99 ) ;
 }
 
-void readSerialBus()                                                            // in debug mode, we can manually send switch commands to store in EEPROM
+
+void runProgram()
 {
-    // if( debugPort.available() > 0)
-    // {
-    //     uint16 recv = 0 ;
-
-    //     POINT_DELAY( 2000 ) ;                                                   // some time to receive more bytes,  updates Xnet in the meantime
-    //     while( debugPort.available() > 0 )
-    //     {
-    //         recv *= 10 ;
-    //         recv += ( debugPort.read() - '0' ) ;
-    //     }
-    //     uint16 address = recv / 10 ;
-    //     uint16   state = recv % 10 ;
-
-    //     passPoint( address | (state << 15) ) ;    
-
-    //     message( "Point ", address, state ) ;    
-    // }
-}
-
-
-void loop()
-{
-    REPEAT_MS( 20 )
-    {
-        sensor.debounce() ;
-
-    } END_REPEAT ;
-
-    if( sensor.getState() == FALLING )
-    {
-        if( recordingDevice == recording )
-        {
-            storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing
-        }
-        else if( recordingDevice == playing )
-        {
-            newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
-        }
-    }
-
     uint32 currTime = millis() ;
-
     if( recordingDevice == playing && (currTime - prevTime) >= nextInterval )
     {
         if( nextInterval == 0 ) // if interval is 0, we are waiting on a sensor or feedback thing to continu.
@@ -312,7 +279,30 @@ void loop()
             message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
         }
     }
+}
 
+void loop()
+{
+    REPEAT_MS( 20 )
+    {
+        sensor.debounce() ;
+
+    } END_REPEAT ;
+
+    if( sensor.getState() == FALLING )
+    {
+        if( recordingDevice == recording )
+        {
+            storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing
+        }
+        else if( recordingDevice == playing )
+        {
+            newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
+        }
+    }
+
+    
+    runProgram() ;
     handlePoints() ;
     //eventHandler() ;                                                          // handles LED to give status indictation
 
