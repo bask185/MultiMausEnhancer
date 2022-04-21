@@ -219,7 +219,7 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
         uint8 newNibble = state & 0x0F ;
 
         address &= 0x007F ;                                                     // the first bits contain 'strange' things? MODULE ADDRESS MUST BE CHECKED!
-
+                                                                                // NOTE it may verywell be that the library mixes up things it shouldn't
         message("feedback", address, state) ;
 
         uint8 index = address * 2 ;                                             // 2 nibbles per address
