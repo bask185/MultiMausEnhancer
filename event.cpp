@@ -1,108 +1,125 @@
-// #include "event.h"
-// #include "src/io.h"
+#include <EEPROM.h>
+#include "event.h"
 
-// const int nEvents   = 10 ;
-// const int nMaxFlash =  5 ;
+typedef struct someName 				// 8 bytes per event
+{
+	uint8 	data1 ;
+	uint16 	data2 ;
+	uint8	data3 ;
+	uint32  time2nextEvent ;
+} Event ;
 
-// uint8  blinkCounter ;
-// uint8  nBlinks ;
-// uint8  leds ;
-// uint8  event ;
-// uint16 blinkSpeed ;
+Event   event ;
 
-// uint8 mode ;
-
-// uint32 prevTime ;
-// const int green   = 0b001 ;
-// const int yellow  = 0b010 ;
-// const int red     = 0b100 ;
-
-// void flash( uint8 _leds, uint8 blinks, uint16 _blinkSpeed )
-// {
-//     blinkCounter = 0 ;
-//     blinkSpeed = _blinkSpeed ;
-//     nBlinks = blinks * 2 ;
-//     leds = _leds ;
-//     prevTime = millis() ;
-// }
-
-// void lightHandler()
-// {
-//     if( event != 0 && (millis() - prevTime > blinkSpeed ) )                             // If event is set, and time is expired, blink led
-//     {
-//         prevTime = millis() ;
-
-//         if( blinkCounter % 2 == 0 )
-//         {
-//             if( leds &  green ) digitalWrite(  greenLed, HIGH ) ;
-//             if( leds & yellow ) digitalWrite( yellowLed, HIGH ) ;
-//             if( leds &    red ) digitalWrite(    redLed, HIGH ) ;
-//         }
-//         else
-//         {
-//             digitalWrite(  greenLed, LOW ) ;
-//             digitalWrite( yellowLed, LOW ) ;
-//             digitalWrite(    redLed, LOW ) ;
-//         }
-//         if( ++ blinkCounter == nBlinks ) { event = 0 ; }                        // if blinked this many times, turn off blinking
-//     }
-
-//     if( event == 0 )
-//     {
-//         if( mode == running )
-//         {
-//             digitalWrite(   greenLed, HIGH ) ;
-//             digitalWrite(  yellowLed,  LOW ) ;
-//             digitalWrite(     redLed,  LOW ) ;
-//         }
-//         if( mode == teachin )
-//         {
-//             REPEAT_MS( SLOW )
-//             {
-//                 digitalWrite(   greenLed, LOW ) ;
-//                 digitalWrite(  yellowLed, LOW ) ;
-//                 digitalWrite(     redLed, !digitalRead( redLed ) ) ;
-//             } END_REPEAT
-//         }
-//         if( mode == OFF )
-//         {
-//             digitalWrite(   greenLed,  LOW ) ;
-//             digitalWrite(  yellowLed,  LOW ) ;
-//             digitalWrite(     redLed,  LOW ) ;
-//         }
-//     }
-// }
+enum eventModes
+{
+    idle,
+    playing,
+    recording,
+    finishing,
+} ;
 
 
-// void setLights( uint8 event )
-// {
-//     switch( event )
-//     {
-//         // case runModeEnabled:    flash( green           ,   5, FAST ) ; break ;
-//         // case teachingEnabled:   flash( yellow          ,   5, FAST ) ; break ;
-//         // case turnedOff:         flash( red             ,   5, FAST ) ; break ; 
-//         // case detectorMade:      flash( yellow          ,   3, FAST ) ; break ;
-//         // case trainBraking:      flash( green | red     ,   1, SLOW ) ; break ;
-//         // case trainArrived:      flash( green | red     ,   2, SLOW ) ; break ;
-//         // case trainDeparting:    flash( green | yellow  ,   1, SLOW ) ; break ;
-//         // case trainDeparted:     flash( green | yellow  ,   2, SLOW ) ; break ;
-//         // case trainNotDeparted:  flash( red             ,   5, FAST ) ; break ;
-//         // case slotAdded:         flash( green|yellow|red,   4, FAST ) ; break ;
-//         // case slotNotFound:      flash( red             ,   3, FAST ) ; break ;
-//         // case slotLoaded:        flash( green  | yellow ,   3, FAST ) ; break ;
-//         // case waiting4address:   flash( green  | yellow ,   1, FAST ) ; break ;
-//         // case addressReceived:   flash( green  | yellow ,   2, FAST ) ; break ;
-//     }
-// }
+const int       baseEEaddress = 0x14 ;
+static uint16   eeAddress ;
+static uint32   prevTime ;
+static uint16   newSensor ;
+uint8           recordingDevice = idle ;
+bool            playingAllowed ;
 
-// /*  runModeEnabled,
-//     teachingEnabled,  
-//     detectorMade,           // 3 flashes orange
-//     trainBreaking,          // 1 flashes green
-//     trainArrived,
-//     trainDeparting,         // 2 flashes green
-//     trainNotDeparted,       // 5 flashes red
-//     trainDeparted,          //
-//     slotAdded,              // 5 flashes yellow
-//     slotNotFound,           // 5 flashed red
-//     slotLoaded              // 5 flashes green*/
+void startRecording() 
+{
+    if( recordingDevice == idle )
+    {
+        eeAddress = 0 ;                     // set EEPROM adres to 0
+        recordingDevice = recording ;       
+        prevTime = millis() ;               // record starting time
+        storeEvent( START, 1, 1 ) ;
+    }
+}
+
+void stopRecording() 
+{
+    if( recordingDevice == recording )
+    {
+        recordingDevice = idle ;
+        storeEvent( STOP, 1, 1 ) ;
+    }
+}
+void startPlaying() 
+{
+    if( recordingDevice == idle )
+    {
+        eeAddress = 0 ;
+        event.time2nextEvent = 10 ;
+        prevTime = millis() ;
+        recordingDevice = playing ;
+        playingAllowed = true ;
+    }
+}
+void stopPlaying() 
+{
+    if( recordingDevice == playing )
+    {
+        recordingDevice = finishing ;
+    }
+}
+
+void storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
+{
+    if( recordingDevice != recording ) return ;
+
+    Event     localEvent ;
+    uint32    currTime = millis() ;
+
+    localEvent.data1 = _data1 ;
+    localEvent.data2 = _data2 ;
+    localEvent.data3 = _data3 ;
+
+    if( _data1 == FEEDBACK ) { localEvent.time2nextEvent = 0 ; }                       // feedback has 0 time
+    else                     { localEvent.time2nextEvent = currTime - prevTime ; }
+
+    prevTime = millis() ;
+
+    EEPROM.put( eeAddress, localEvent ) ;
+
+    eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
+}
+
+Event getEvent()
+{
+    Event localEvent ;
+
+    EEPROM.get( eeAddress, localEvent ) ;
+
+    eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
+
+    return localEvent ;
+}
+
+
+void sendFeedbackEvent( uint16 number )
+{
+    newSensor = number ;
+}
+
+void eventHandler()
+{
+    uint32 currTime = millis() ;
+
+    if( recordingDevice == playing && (currTime - prevTime) >= event.time2nextEvent )
+    {
+        if( event.time2nextEvent == 0 )                                         
+        {
+            if( newSensor == event.data2 ) event.time2nextEvent = 1 ;
+            return ;
+        }
+                                       //    8bit         16bit        8bit       // for here and now, data1, is type, data2 is address and data 3 just data.
+        if( notifyEvent ) notifyEvent( event.data1, event.data2, event.data3 ) ;
+
+        prevTime = currTime ;
+        event = getEvent() ;     
+
+        newSensor = 0 ;
+    }
+}

@@ -7,7 +7,7 @@
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include <SoftwareSerial.h>
 #include "points.h"
-#include "shuttle.h"
+//#include "shuttle.h"
 #include "event.h"
 
 SoftwareSerial debugPort(3,4) ;
@@ -33,22 +33,18 @@ uint8   setSpeed ;
 uint8   knob ;
 uint8   newSensor ;
 
-
-/****** recording / playing programs *******/
-enum eventModes
+enum events
 {
-	idle,
-	playing,
-	recording,
+    accessoryEvent = 3,       // 0,1,2 are used for feedback, start and stop
+    speedEvent,
+    F0_F4Event,
+    F5_F8Event,
+    F9_F12Event,
+    F13_F20Event,
 } ;
 
 uint32  nextInterval ;
 uint32  prevTime ;
-Event   event ;
-uint8   recordingDevice = idle ;
-bool    playingAllowed ;
-
-
 volatile unsigned long long oldState ; // 64 bits
 
 void message( String mess, int val1, int val2 )
@@ -80,7 +76,9 @@ void setPoint( uint16 pointAddress, uint8 state )
 //  N=0 is the lower nibble, N=1 the upper nibble.
 void notifyXNetFeedback( uint16_t address, uint8_t state )
 {                                        // ITT = 010 for feedback modules
-    message("feedback", Address, state) ;
+    if( state & 0b01000000 )
+
+    message("feedback", address, state) ;
 
     // if( !(state & 0b1000000) )
     // {
@@ -110,13 +108,13 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 
         message(F( "Xnet Point received"), Address, data ) ;
         
-        if(      Address == 997 && data == 0 ) { message(F("playing started"  ), 0, 0 ) ; playingAllowed = true ; startPlaying() ; recordingDevice = playing ; event = getEvent() ; nextInterval = 1 ; }
-        else if( Address == 997 && data == 1 ) { message(F("playing stopped"  ), 0, 0 ) ; playingAllowed = false ; }
-        else if( Address == 998 && data == 0 ) { message(F("recording started"), 0, 0 ) ; storeEvent( event_start, 0, 0 ) ; recordingDevice = recording ;}
-        else if( Address == 998 && data == 1 ) { message(F("recording stopped"), 0, 0 ) ; storeEvent( event_stop,  0, 0 ) ; recordingDevice = idle ; }
-        else if( recordingDevice == recording )
+        if(      Address == 997 && data == 0 ) { message(F("playing started"  ), 0, 0 ) ; startPlaying()   ; }
+        else if( Address == 997 && data == 1 ) { message(F("playing stopped"  ), 0, 0 ) ; stopPlaying()    ; }
+        else if( Address == 998 && data == 0 ) { message(F("recording started"), 0, 0 ) ; startRecording() ; }
+        else if( Address == 998 && data == 1 ) { message(F("recording stopped"), 0, 0 ) ; stopRecording()  ; }
+        else
         {
-            storeEvent( event_point, Address, data ) ;
+            storeEvent( accessoryEvent, Address, data ) ;
         }
     }   
 }
@@ -125,11 +123,7 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
 {
     //return ; // DELETE ME
 
-    if( recordingDevice == recording )
-    {
-        storeEvent( event_speed, Address, Speed ) ;
-        return ;
-    }
+    storeEvent( speedEvent, Address, Speed ) ;
 
     static uint8 state = 0 , prevKnob = 0xFF ;
     int8_t speed ;
@@ -163,18 +157,17 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 
 {
     if( Address != 1)
     {
-        if( recordingDevice == recording )
+        switch( bank )
         {
-            switch( bank )
-            {
-            case    F0_F4: storeEvent(   event_F0_F4, Address, func ) ; break ;
-            case    F5_F8: storeEvent(   event_F5_F8, Address, func ) ; break ;
-            case   F9_F12: storeEvent(  event_F9_F12, Address, func ) ; break ;
-            case  F13_F20: storeEvent( event_F13_F20, Address, func ) ; break ;
-            }
+        case    F0_F4: storeEvent(   F0_F4Event, Address, func ) ; break ;
+        case    F5_F8: storeEvent(   F5_F8Event, Address, func ) ; break ;
+        case   F9_F12: storeEvent(  F9_F12Event, Address, func ) ; break ;
+        case  F13_F20: storeEvent( F13_F20Event, Address, func ) ; break ;
         }
         return ;
     }
+    
+    // following code is only for address 1
 
     volatile static uint8 prevState[4];
     volatile uint8  fKey ;
@@ -220,16 +213,30 @@ void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( A
 
 void notifyXNetPower(uint8_t State)
 {
-
     message(F("POWER"), State , 0xFF ) ;
     //if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ }
     //else                    { /*digitalWrite(led,  LOW);*/ }
 }
+
+void notifyEvent( uint8 type, uint16 address, uint8 data )                            // CALL BACK FUNCTION FROM EVENT.CPP
+{
+    switch( type )
+    {
+        case START:          message(F("player: started"), 0, 0 ) ;                                                               break ; // flash an led?
+        case speedEvent:     message(F("player: setting speed"), address, data ) ; Xnet.setSpeed(      address, Loco128, data ) ; break ; 
+        case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ; Xnet.setFunc0to4(   address,data ) ;           break ;
+        case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ; Xnet.setFunc5to8(   address,data ) ;           break ;
+        case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ; Xnet.setFunc9to12(  address,data ) ;           break ;
+        case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ; Xnet.setFunc13to20( address,data ) ;           break ;
+        case accessoryEvent: message(F("player: setting point"), address, data ) ;           setPoint( address,data ) ;           break ;
+        case FEEDBACK:       message(F("player: feedback"),      address, data ) ;                                                break ;
+        case STOP:           message(F("player: program stopped"),   0, 0 ) ;                                                     break ; // flash an led?
+    }
+}
+
 void setup()
 {
     uint16_t eeAddress = 0 ;
-    // setMode( idling ) ;
-
 
     //initIO() ;
 
@@ -240,71 +247,67 @@ void setup()
     Xnet.ReqLocoBusy( 99 ) ;
 }
 
+// void runProgram() // DEPRECATED IN FAVOUR
+// {
+//     uint32 currTime = millis() ;
+//     if( recordingDevice == playing && (currTime - prevTime) >= nextInterval )
+//     {
+//         if( nextInterval == 0 ) // if interval is 0, we are waiting on a sensor or feedback thing to continu.
+//         {
+//             if( newSensor == 1 )
+//             {
+//                 nextInterval = 1 ;
+//             }
+//         }
+//         else 
+//         {
+//             switch( event.type )
+//             {
+//             case event_start:    message(F("player: started"), 0, 0 ) ; break ;
+//             case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
+//             case event_F0_F4:    message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
+//             case event_F5_F8:    message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
+//             case event_F9_F12:   message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
+//             case event_F13_F20:  message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
+//             case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ;
+//             case event_feedback: message(F("player: feedback"),      event.address, event.data ) ;                                                       break ;
+//             case event_stop:
+//                 if( playingAllowed == false ) {
+//                                 message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
+//                 else {           message(F("player: program resetting"), 0, 0 ) ;                   startPlaying() ;         }                           break ;
 
-void runProgram()
-{
-    uint32 currTime = millis() ;
-    if( recordingDevice == playing && (currTime - prevTime) >= nextInterval )
-    {
-        if( nextInterval == 0 ) // if interval is 0, we are waiting on a sensor or feedback thing to continu.
-        {
-            if( newSensor == 1 )
-            {
-                nextInterval = 1 ;
-            }
-        }
-        else 
-        {
-            switch( event.type )
-            {
-            case event_start:    message(F("player: started"), 0, 0 ) ; break ;
-            case event_speed:    message(F("player: setting speed"), event.address, event.data ) ; Xnet.setSpeed( event.address, Loco128, event.data ) ; break ;
-            case event_F0_F4:    message(F("player: F0-F4"),         event.address, event.data ) ; Xnet.setFunc0to4(   event.address, event.data ) ;     break ;
-            case event_F5_F8:    message(F("player: F5-F8"),         event.address, event.data ) ; Xnet.setFunc5to8(   event.address, event.data ) ;     break ;
-            case event_F9_F12:   message(F("player: F9-F12"),        event.address, event.data ) ; Xnet.setFunc9to12(  event.address, event.data ) ;     break ;
-            case event_F13_F20:  message(F("player: F13-F20"),       event.address, event.data ) ; Xnet.setFunc13to20( event.address, event.data ) ;     break ;
-            case event_point:    message(F("player: setting point"), event.address, event.data ) ;           setPoint( event.address, event.data ) ;     break ;
-            case event_feedback: message(F("player: feedback"),      event.address, event.data ) ;                                                       break ;
-            case event_stop:
-                if( playingAllowed == false ) {
-                                message(F("player: program stopped"),   0, 0 ) ;                   recordingDevice = idle ; }
-                else {           message(F("player: program resetting"), 0, 0 ) ;                   startPlaying() ;         }                           break ;
+//             }
 
-            }
-
-            prevTime = currTime ;
-            event = getEvent() ;     
-            nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
-            newSensor = 0 ;
-            message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
-        }
-    }
-}
+//             prevTime = currTime ;
+//             event = getEvent() ;     
+//             nextInterval = event.time2nextEvent ;                                   // load timer to next event ;
+//             newSensor = 0 ;
+//             message(F("next event"), event.type, nextInterval/100 ) ;               // display message 0.1s
+//         }
+//     }
+// }
 
 void loop()
 {
-    REPEAT_MS( 20 )
-    {
-        sensor.debounce() ;
+    // REPEAT_MS( 20 )
+    // {
+    //     sensor.debounce() ;
 
-    } END_REPEAT ;
+    // } END_REPEAT ;
 
-    if( sensor.getState() == FALLING )
-    {
-        if( recordingDevice == recording )
-        {
-            storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing
-        }
-        else if( recordingDevice == playing )
-        {
-            newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
-        }
-    }
+    // if( sensor.getState() == FALLING )
+    // {
+    //     if( recordingDevice == recording )
+    //     {
+    //         storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing LINKED TO INPUT PIN D5
+    //     }
+    //     else if( recordingDevice == playing )
+    //     {
+    //         newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
+    //     }
+    // }
 
-    
-    runProgram() ;
     handlePoints() ;
-    //eventHandler() ;                                                          // handles LED to give status indictation
-
+    eventHandler() ;                                                            // handles playing program
     Xnet.update() ;
 }
