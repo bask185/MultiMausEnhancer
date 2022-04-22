@@ -48,7 +48,7 @@ uint32  nextInterval ;
 uint32  prevTime ;
 volatile unsigned long long oldState ; // 64 bits
 
-void message( String mess, int val1, int val2 )
+void message( String mess, uint16 val1, uint16 val2 )
 {
     debugPort.print( mess ) ; debugPort.write(' ') ;
     debugPort.print( val1 ) ; debugPort.write(' ') ;
@@ -72,17 +72,42 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
         data &= 0x1 ;
         passPoint( Address | (data<<15) ) ;
 
-        message(F( "Xnet Point received"), Address, data ) ;
+        //message(F( "Xnet Point received"), Address, data ) ;
         
-        if(      Address == 997 && data == 0 ) { message(F("playing started"  ), 0, 0 ) ; startPlaying()   ; } // may be replaced to a loco address with functions?
-        else if( Address == 997 && data == 1 ) { message(F("playing stopped"  ), 0, 0 ) ; stopPlaying()    ; }
-        else if( Address == 998 && data == 0 ) { message(F("recording started"), 0, 0 ) ; startRecording() ; }
-        else if( Address == 998 && data == 1 ) { message(F("recording stopped"), 0, 0 ) ; stopRecording()  ; }
+        if(      Address == 997 && data == 0 ) { startPlaying()   ; } // may be replaced to a loco address with functions?
+        else if( Address == 997 && data == 1 ) { stopPlaying()    ; }
+        else if( Address == 998 && data == 0 ) { startRecording() ; }
+        else if( Address == 998 && data == 1 ) { stopRecording()  ; }
         else
         {
             storeEvent( accessoryEvent, Address, data ) ;
         }
     }   
+}
+
+void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )                   
+{
+    storeEvent( speedEvent, Address, Speed ) ;  /// NOTE, z21 used this, DR5000 forces everything to 128?
+
+    static uint8 state = 0 , prevKnob = 0xFF ;
+    int8_t speed ;
+
+    speed = Speed & 0x7F ;
+
+    if( speed > 0 ) speed -- ;
+    if( Speed & 0x80 ) speed = -speed ;
+   
+    if(         speed <  -20                ) knob = 4 ;
+    else if(    speed >= -5 && speed < -5 ) knob = 3 ;
+    else if(    speed >   -5 && speed <  5 ) knob = 2 ;
+    else if(    speed <=  5 && speed >  5 ) knob = 1 ;
+    else if(    speed >   20                ) knob = 0 ;
+
+    if( knob != prevKnob )
+    {
+        prevKnob = knob ;
+        message(F("knob 28 "), knob, Speed ) ;
+    }
 }
 
 void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
@@ -108,12 +133,7 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
     if( knob != prevKnob )
     {
         prevKnob = knob ;
-        message(F("knob "), knob, Speed ) ;
-    }
-
-    if( Address == 6 )
-    {
-        setSpeed = Speed ;
+        message(F("knob 128"), knob, Speed ) ;
     }
 }
 
@@ -213,14 +233,16 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
 //  N   This bit describes which nibble of a turnout or feedback module this response describes.
 //  N=0 is the lower nibble, N=1 the upper nibble.
 void notifyXNetFeedback( uint16_t address, uint8_t state )                      // Xnet knows 127 feedback module addresses with 8 bits per address
-{                                       
+{    
     if( state & 0b01000000 )                                                    // ITT = 010 for feedback modules
     {
+       message("feedback", address, state) ;
+
         uint8 newNibble = state & 0x0F ;
 
-        address &= 0x007F ;                                                     // the first bits contain 'strange' things? MODULE ADDRESS MUST BE CHECKED!
+       // address &= 0xFF ;                                                     // the first bits contain 'strange' things? MODULE ADDRESS MUST BE CHECKED!
                                                                                 // NOTE it may verywell be that the library mixes up things it shouldn't
-        message("feedback", address, state) ;
+        
 
         uint8 index = address * 2 ;                                             // 2 nibbles per address
         if (state & 0b10000) index ++ ;                                         // if bit N is set, correct index to upper nibble
@@ -234,9 +256,9 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
                 if( newNibble & bitMask ) { prevNibble[index] |=  bitMask ; }
                 else                      { prevNibble[index] &= ~bitMask ; }
 
-                storeEvent( FEEDBACK,  address, 0 ) ;
+                //storeEvent( FEEDBACK,  address, 0 ) ;
                 sendFeedbackEvent( address ) ;
-                message("feedback", address, state) ;
+                //message("feedback", address, state) ;
             }
         }
     }
@@ -253,7 +275,7 @@ void setup()
     debugPort.begin( 9600 ) ;   
     message(F("multimause enhancer booted"),3,5);
 
-    Xnet.ReqLocoBusy( 99 ) ; 
+    //Xnet.ReqLocoBusy( 99 ) ; 
 }
 
 void loop()

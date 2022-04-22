@@ -3,7 +3,7 @@
 #include <EEPROM.h>
 #include "src/stateMachineClass.h"
 
-extern void message( String mess, int val1, int val2 ) ;
+extern void message( String mess, uint16 val1, uint16 val2 ) ;
 
 const int nPointsPerStreet = 16 ;
 const int nStreets = 16 ;
@@ -34,7 +34,7 @@ void passPoint( uint16 _address )
     newRaw     = _address ;
     newAddress = newRaw & 0x3FFF ;
     newState   = newRaw >> 15 ;
-    message( F("passed points"),  newAddress,  newState ) ;
+    //message( F("passed points"),  newAddress,  newState ) ;
     pointReceived = true ;
 }
 
