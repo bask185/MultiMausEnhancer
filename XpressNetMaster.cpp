@@ -542,7 +542,7 @@ void XpressNetMasterClass::XNetAnalyseReceived(void) {		//work on received data
 				for (byte i = 1; i <= len; i++) {
 					if(notifyXNetFeedback)
 						// notifyXNetTrnt((    XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetdata1] << 2)          | ((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetdata2] & B110) >> 1),        XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetdata2]);
-						notifyXNetFeedback((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)-1] << 2) | ((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)] & B110) >> 1), XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)]);
+						notifyXNetFeedback((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)-1]) | ((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)] ), XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)]);
 						//notifyXNetFeedback((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)-1] << 2) | ((XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)] & B110) >> 1), XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetheader+(i*2)]); //original
 					//XNetRXBuffer.msg[XNetRXBuffer.get].data[XNetdata2] = 0000 ABBP
 					//A = Weichenausgang(Spulenspannung EIN/AUS)
