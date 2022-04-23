@@ -236,19 +236,21 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
 {    
     if( state & 0b01000000 )                                                    // ITT = 010 for feedback modules
     {
-       message("feedback", address, state) ;
+        address >>= 2 ;
+        address &= 0x0007 ;
+        address <<= 3 ;
 
         uint8 newNibble = state & 0x0F ;
 
-       // address &= 0xFF ;                                                     // the first bits contain 'strange' things? MODULE ADDRESS MUST BE CHECKED!
-                                                                                // NOTE it may verywell be that the library mixes up things it shouldn't
-        
-
         uint8 index = address * 2 ;                                             // 2 nibbles per address
-        if (state & 0b10000) index ++ ;                                         // if bit N is set, correct index to upper nibble
+        if (state & 0b10000)
+        {
+            index ++ ;                                                          // if bit N is set, correct index to upper nibble Note index should be fine
+            address += 4 ;
+        }
         
 
-        for( uint8 bitMask = 0x01 ; bitMask < 0x08 ; bitMask <<= 1 )
+        for( uint8 bitMask = 0x01 ; bitMask < 0x40 ; bitMask <<= 1 )            // check 4 bits
         {
             address ++ ;
             if( (newNibble & bitMask) != (prevNibble[index] & bitMask ) )
@@ -256,9 +258,9 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
                 if( newNibble & bitMask ) { prevNibble[index] |=  bitMask ; }
                 else                      { prevNibble[index] &= ~bitMask ; }
 
-                //storeEvent( FEEDBACK,  address, 0 ) ;
-                sendFeedbackEvent( address ) ;
-                //message("feedback", address, state) ;
+                message("feedback", address, state) ;
+                storeEvent( FEEDBACK, address, 1  ) ;                           // for recording
+                sendFeedbackEvent( address ) ;                                  // for playing
             }
         }
     }
