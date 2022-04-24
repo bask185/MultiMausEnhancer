@@ -128,11 +128,11 @@ void eventHandler()
     if( (recordingDevice == playing || recordingDevice == finishing)
     && (currTime - prevTime) >= event.time2nextEvent )
     {
-        // if( event.time2nextEvent == 0 )                                         
-        // {
-        //     if( newSensor == event.data2 ) event.time2nextEvent = 1 ; NOT PRESENT IN THIS UNIT
-        //     return ;
-        // }
+        if( event.time2nextEvent == 0 )                                         
+        {
+            if( newSensor == event.data2 ) event.time2nextEvent = 1 ;
+            return ;
+        }
                                        //    8bit         16bit        8bit       // for here and now, data1, is type, data2 is address and data 3 just data.
         if( notifyEvent ) notifyEvent( event.data1, event.data2, event.data3 ) ;
 
