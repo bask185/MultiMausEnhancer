@@ -141,7 +141,16 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
 
 void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 // bank is verivied, address is verivied, Address is verivied
 {
-    if( Address != 1)
+    if( Address == 6 && bank == F0_F4 )
+    {
+        if( func & 0b0001 ) startPlaying() ;
+        if( func & 0b0010 )  stopPlaying() ;
+        if( func & 0b0100 ) startRecording() ;
+        if( func & 0b1000 )  stopRecording() ;
+        return ;
+    }
+
+    if( Address != 1 )
     {
         switch( bank )
         {
@@ -255,12 +264,17 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
             address ++ ;
             if( (newNibble & bitMask) != (prevNibble[index] & bitMask ) )
             {
-                if( newNibble & bitMask ) { prevNibble[index] |=  bitMask ; }
-                else                      { prevNibble[index] &= ~bitMask ; }
-
-                message("feedback", address, state) ;
-                storeEvent( FEEDBACK, address, 1  ) ;                           // for recording
-                sendFeedbackEvent( address ) ;                                  // for playing
+                if( newNibble & bitMask )
+                {
+                    prevNibble[index] |=  bitMask ;
+                    message("feedback", address, state) ;
+                    storeEvent( FEEDBACK, address, 1  ) ;                           // for recording
+                    sendFeedbackEvent( address ) ;   
+                }
+                else
+                {
+                    prevNibble[index] &= ~bitMask ;
+                }
             }
         }
     }

@@ -1,7 +1,8 @@
 #include <EEPROM.h>
 #include "event.h"
 
-extern void message( String mess, uint16 val1, uint16 val2 ) ;
+
+//extern void message( String mess, uint16 val1, uint16 val2 ) ;
 
 typedef struct someName 				// 8 bytes per event
 {
@@ -27,7 +28,6 @@ static uint16   eeAddress ;
 static uint32   prevTime ;
 static uint16   newSensor ;
 uint8           recordingDevice = idle ;
-bool            playingAllowed ;
 
 void startRecording() 
 {
@@ -49,15 +49,28 @@ void stopRecording()
         storeEvent( STOP, 1, 1 ) ;
     }
 }
+
+Event getEvent()
+{
+    Event localEvent ;
+
+    EEPROM.get( eeAddress, localEvent ) ;
+
+    eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
+
+    return localEvent ;
+}
+
+
 void startPlaying() 
 {
     if( recordingDevice == idle )
     {
         eeAddress = 0 ;
-        event.time2nextEvent = 10 ;
+        event = getEvent() ;            // should load the start event
+
         prevTime = millis() ;
         recordingDevice = playing ;
-        playingAllowed = true ;
     }
 }
 void stopPlaying() 
@@ -84,20 +97,6 @@ void storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
 {
     if( recordingDevice != recording ) return ;
 
-    switch( _data1 )
-    {
-        case 0: message("recording: feedback",  _data2, _data3 ) ; break ;
-        case 1: message("recording:  start",    _data2, _data3 ) ; break ;
-        case 2: message("recording:  stop",     _data2, _data3 ) ; break ;
-        case 3: message("recording: accesorry", _data2, _data3 ) ; break ;
-        case 4: message("recording: speed",     _data2, _data3 ) ; break ;
-        case 5: message("recording: F0_F4",     _data2, _data3 ) ; break ;
-        case 6: message("recording: F5_F8",     _data2, _data3 ) ; break ;
-        case 7: message("recording: F9_F12",    _data2, _data3 ) ; break ;
-        case 8: message("recording: F13_F20",   _data2, _data3 ) ; break ;
-    }
-    
-
     Event     localEvent ;
     uint32    currTime = millis() ;
 
@@ -115,16 +114,6 @@ void storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
     eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
 }
 
-Event getEvent()
-{
-    Event localEvent ;
-
-    EEPROM.get( eeAddress, localEvent ) ;
-
-    eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
-
-    return localEvent ;
-}
 
 
 void sendFeedbackEvent( uint16 number )
@@ -139,11 +128,11 @@ void eventHandler()
     if( (recordingDevice == playing || recordingDevice == finishing)
     && (currTime - prevTime) >= event.time2nextEvent )
     {
-        if( event.time2nextEvent == 0 )                                         
-        {
-            if( newSensor == event.data2 ) event.time2nextEvent = 1 ;
-            return ;
-        }
+        // if( event.time2nextEvent == 0 )                                         
+        // {
+        //     if( newSensor == event.data2 ) event.time2nextEvent = 1 ; NOT PRESENT IN THIS UNIT
+        //     return ;
+        // }
                                        //    8bit         16bit        8bit       // for here and now, data1, is type, data2 is address and data 3 just data.
         if( notifyEvent ) notifyEvent( event.data1, event.data2, event.data3 ) ;
 
