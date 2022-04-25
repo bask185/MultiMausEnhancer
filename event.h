@@ -28,13 +28,13 @@ class EventHandler
 public:
     EventHandler( uint32, uint8 ); // enter EEPROM ADDRESS AND STUFF
     
-    void    startRecording() ;
+    void    startRecording() ;      // need begin function? to init I2c bus??
     void    stopRecording() ;
     void    startPlaying() ;
     void    stopPlaying() ;
     void    resetProgram() ;
     void    sendFeedbackEvent( uint16 ) ;
-    void    eventHandler() ;
+    void    update() ;
     void    storeEvent( uint8, uint16, uint8 ) ;
 
 private:
@@ -46,7 +46,7 @@ private:
     uint16  eeAddress ;
     uint32  prevTime ;
     uint16  newSensor ;
-    uint8   recordingDevice = idle ;
+    uint8   recordingDevice ;
     uint8   eepromType ;
 
 

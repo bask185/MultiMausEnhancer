@@ -15,12 +15,13 @@ enum eventModes
 
 EventHandler::EventHandler( uint32 _I2Caddress, uint8 _eepromType )
 {
+    recordingDevice = idle ;
     I2Caddress  = _I2Caddress ;
     eepromType  = _eepromType ;
 
-    if( eepromType == I2C_EEPROM )
+    if( eepromType == I2C_EEPROM )                                              // move this stuff to a 'begin' function
     {
-        static bool initI2cBus = false ;
+        static bool initI2cBus = false ;    
         if( initI2cBus == false )
         {   initI2cBus  = true ;
 
@@ -116,7 +117,7 @@ void EventHandler::sendFeedbackEvent( uint16 number )
     newSensor = number ;
 }
 
-void EventHandler::eventHandler()
+void EventHandler::update()
 {
     uint32 currTime = millis() ;
 
