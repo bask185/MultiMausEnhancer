@@ -26,8 +26,9 @@ typedef struct 				// 8 bytes per event
 class EventHandler
 {
 public:
-    EventHandler( uint32, uint8 ); // enter EEPROM ADDRESS AND STUFF
-    
+    EventHandler( uint32  ) ;
+    EventHandler( uint32, uint8 ) ;
+
     void    startRecording() ;      // need begin function? to init I2c bus??
     void    stopRecording() ;
     void    startPlaying() ;
@@ -35,6 +36,7 @@ public:
     void    resetProgram() ;
     void    sendFeedbackEvent( uint16 ) ;
     void    update() ;
+    void    begin() ;
     void    storeEvent( uint8, uint16, uint8 ) ;
 
 private:
@@ -42,7 +44,8 @@ private:
     Event   getEvent() ;
 
 
-    uint16  I2Caddress ;
+    uint32  beginAddress ;
+    uint8   i2cAddress ;
     uint16  eeAddress ;
     uint32  prevTime ;
     uint16  newSensor ;

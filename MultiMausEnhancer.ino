@@ -27,7 +27,8 @@ Debounce sensor( 5 ) ;
                                 while( millis() - prevTime <= interval ) { Xnet.update(); }
 
 XpressNetMasterClass Xnet ;
-EventHandler eventHandler( 0, INTERNAL_EEPROM ) ;
+EventHandler eventHandler( 0 ) ; 
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
 
 uint8   setSpeed ;
 uint8   knob ;
@@ -298,20 +299,15 @@ void loop()
 {
     // REPEAT_MS( 20 )
     // {
-    //     sensor.debounce() ;
+    //     sensor1.debounce() ;
 
     // } END_REPEAT ;
 
-    // if( sensor.getState() == FALLING )
-    // {
-    //     if( recordingDevice == recording )
-    //     {
-    //         storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing LINKED TO INPUT PIN D5
-    //     }
-    //     else if( recordingDevice == playing )
-    //     {
-    //         newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
-    //     }
+    // if( sensor1.getState() == FALLING )
+    // {  
+    //     for( int i = 0 ; i < nChannels)                                                                          // for loop needed to send all sensor input to all eventHandlers
+    //     eventHandler.storeEvent( FEEDBACK, 65000, 1  ) ;                     // internal sensors for recording
+    //     eventHandler.sendFeedbackEvent( 65000 ) ;   
     // }
 
     handlePoints() ;

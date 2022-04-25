@@ -13,13 +13,24 @@ enum eventModes
     finishing,
 } ;
 
-EventHandler::EventHandler( uint32 _I2Caddress, uint8 _eepromType )
+EventHandler::EventHandler( uint32 _beginAddress )
 {
     recordingDevice = idle ;
-    I2Caddress  = _I2Caddress ;
-    eepromType  = _eepromType ;
+    beginAddress = _beginAddress ;
+    eepromType   = INTERNAL_EEPROM ;
+}
 
-    if( eepromType == I2C_EEPROM )                                              // move this stuff to a 'begin' function
+EventHandler::EventHandler( uint32 _beginAddress , uint8 _i2cAddress )
+{
+    recordingDevice = idle ;
+    beginAddress = _beginAddress ;
+    eepromType   = I2C_EEPROM ;
+    i2cAddress   = _i2cAddress ;
+}
+
+void EventHandler::begin()
+{
+    if( eepromType == I2C_EEPROM )
     {
         static bool initI2cBus = false ;    
         if( initI2cBus == false )
