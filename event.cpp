@@ -1,18 +1,9 @@
 #include <EEPROM.h>
 #include "event.h"
 
-
 //extern void message( String mess, uint16 val1, uint16 val2 ) ;
 
-typedef struct someName 				// 8 bytes per event
-{
-	uint8 	data1 ;
-	uint16 	data2 ;
-	uint8	data3 ;
-	uint32  time2nextEvent ;
-} Event ;
 
-Event   event ;
 
 enum eventModes
 {
@@ -22,14 +13,35 @@ enum eventModes
     finishing,
 } ;
 
+EventHandler::EventHandler( uint32 _beginAddress )
+{
+    recordingDevice = idle ;
+    beginAddress = _beginAddress ;
+    eepromType   = INTERNAL_EEPROM ;
+}
 
-const int       baseEEaddress = 0x14 ;
-static uint16   eeAddress ;
-static uint32   prevTime ;
-static uint16   newSensor ;
-uint8           recordingDevice = idle ;
+EventHandler::EventHandler( uint32 _beginAddress , uint8 _i2cAddress )
+{
+    recordingDevice = idle ;
+    beginAddress = _beginAddress ;
+    eepromType   = I2C_EEPROM ;
+    i2cAddress   = _i2cAddress ;
+}
 
-void startRecording() 
+void EventHandler::begin()
+{
+    if( eepromType == I2C_EEPROM )
+    {
+        static bool initI2cBus = false ;    
+        if( initI2cBus == false )
+        {   initI2cBus  = true ;
+
+            // call the function to init I2C bus
+        }
+    }
+}
+
+void EventHandler::startRecording() 
 {
     if( recordingDevice == idle )
     {
@@ -40,7 +52,7 @@ void startRecording()
     }
 }
 
-void stopRecording() 
+void EventHandler::stopRecording() 
 {
     storeEvent( STOP, 1, 1 ) ;
     if( recordingDevice == recording )
@@ -50,11 +62,12 @@ void stopRecording()
     }
 }
 
-Event getEvent()
+Event EventHandler::getEvent()
 {
     Event localEvent ;
 
-    EEPROM.get( eeAddress, localEvent ) ;
+    if( eepromType == INTERNAL_EEPROM )   EEPROM.get( eeAddress, localEvent ) ;
+    //else                               i2cEeprom.get( eeAddress, localEvent ) ;
 
     eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
 
@@ -62,18 +75,18 @@ Event getEvent()
 }
 
 
-void startPlaying() 
+void EventHandler::startPlaying() 
 {
     if( recordingDevice == idle )
     {
         eeAddress = 0 ;
-        event = getEvent() ;            // should load the start event
+        event = getEvent() ;                                                    // should load the start event
 
         prevTime = millis() ;
         recordingDevice = playing ;
     }
 }
-void stopPlaying() 
+void EventHandler::stopPlaying() 
 {
     if( recordingDevice == playing )
     {
@@ -81,19 +94,13 @@ void stopPlaying()
     }
 }
 
-//    feedback 0
-//    start
-//    stop
-//    accessoryEvent = 3,       // 0,1,2 are used for feedback, start and stop
-//    speedEvent 4,
-//    F0_F4Event, 5
-//    F5_F8Event, 6
-//    F9_F12Event, 7
-//    F13_F20Event, 8
+void EventHandler::resetProgram() 
+{
+    recordingDevice = idle ;
+}
 
 
-
-void storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
+void EventHandler::storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
 {
     if( recordingDevice != recording ) return ;
 
@@ -109,19 +116,19 @@ void storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
 
     prevTime = millis() ;
 
-    EEPROM.put( eeAddress, localEvent ) ;
+    if( eepromType == INTERNAL_EEPROM )   EEPROM.put( eeAddress, localEvent ) ;
+    //else                               i2cEeprom.put( eeAddress, localEvent ) ;
 
     eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
 }
 
 
-
-void sendFeedbackEvent( uint16 number )
+void EventHandler::sendFeedbackEvent( uint16 number )
 {
     newSensor = number ;
 }
 
-void eventHandler()
+void EventHandler::update()
 {
     uint32 currTime = millis() ;
 

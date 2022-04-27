@@ -27,7 +27,8 @@ Debounce sensor( 5 ) ;
                                 while( millis() - prevTime <= interval ) { Xnet.update(); }
 
 XpressNetMasterClass Xnet ;
-
+EventHandler eventHandler( 0 ) ; 
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
 
 uint8   setSpeed ;
 uint8   knob ;
@@ -74,20 +75,20 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 
         //message(F( "Xnet Point received"), Address, data ) ;
         
-        if(      Address == 997 && data == 0 ) { startPlaying()   ; } // may be replaced to a loco address with functions?
-        else if( Address == 997 && data == 1 ) { stopPlaying()    ; }
-        else if( Address == 998 && data == 0 ) { startRecording() ; }
-        else if( Address == 998 && data == 1 ) { stopRecording()  ; }
+        if(      Address == 997 && data == 0 ) { eventHandler.startPlaying()   ; } // may be replaced to a loco address with functions?
+        else if( Address == 997 && data == 1 ) { eventHandler.stopPlaying()    ; }
+        else if( Address == 998 && data == 0 ) { eventHandler.startRecording() ; }
+        else if( Address == 998 && data == 1 ) { eventHandler.stopRecording()  ; }
         else
         {
-            storeEvent( accessoryEvent, Address, data ) ;
+            eventHandler.storeEvent( accessoryEvent, Address, data ) ;
         }
     }   
 }
 
 void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )                   
 {
-    storeEvent( speedEvent, Address, Speed ) ;  /// NOTE, z21 used this, DR5000 forces everything to 128?
+    eventHandler.storeEvent( speedEvent, Address, Speed ) ;  /// NOTE, z21 used this, DR5000 forces everything to 128?
 
     static uint8 state = 0 , prevKnob = 0xFF ;
     int8_t speed ;
@@ -97,11 +98,11 @@ void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )
     if( speed > 0 ) speed -- ;
     if( Speed & 0x80 ) speed = -speed ;
    
-    if(         speed <  -20                ) knob = 4 ;
+    if(         speed <  -20              ) knob = 4 ;
     else if(    speed >= -5 && speed < -5 ) knob = 3 ;
-    else if(    speed >   -5 && speed <  5 ) knob = 2 ;
+    else if(    speed >  -5 && speed <  5 ) knob = 2 ;
     else if(    speed <=  5 && speed >  5 ) knob = 1 ;
-    else if(    speed >   20                ) knob = 0 ;
+    else if(    speed >   20              ) knob = 0 ;
 
     if( knob != prevKnob )
     {
@@ -114,7 +115,7 @@ void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )
 {
     //return ; // DELETE ME
 
-    storeEvent( speedEvent, Address, Speed ) ;
+    eventHandler.storeEvent( speedEvent, Address, Speed ) ;
 
     static uint8 state = 0 , prevKnob = 0xFF ;
     int8_t speed ;
@@ -143,10 +144,10 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 
 {
     if( Address == 6 && bank == F0_F4 )
     {
-        if( func & 0b0001 ) startPlaying() ;
-        if( func & 0b0010 )  stopPlaying() ;
-        if( func & 0b0100 ) startRecording() ;
-        if( func & 0b1000 )  stopRecording() ;
+        if( func & 0b0001 ) eventHandler.startPlaying() ;
+        if( func & 0b0010 ) eventHandler.stopPlaying() ;
+        if( func & 0b0100 ) eventHandler.startRecording() ;
+        if( func & 0b1000 ) eventHandler.stopRecording() ;
         return ;
     }
 
@@ -154,10 +155,10 @@ void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 
     {
         switch( bank )
         {
-        case    F0_F4: storeEvent(   F0_F4Event, Address, func ) ; break ;
-        case    F5_F8: storeEvent(   F5_F8Event, Address, func ) ; break ;
-        case   F9_F12: storeEvent(  F9_F12Event, Address, func ) ; break ;
-        case  F13_F20: storeEvent( F13_F20Event, Address, func ) ; break ;
+        case    F0_F4: eventHandler.storeEvent(   F0_F4Event, Address, func ) ; break ;
+        case    F5_F8: eventHandler.storeEvent(   F5_F8Event, Address, func ) ; break ;
+        case   F9_F12: eventHandler.storeEvent(  F9_F12Event, Address, func ) ; break ;
+        case  F13_F20: eventHandler.storeEvent( F13_F20Event, Address, func ) ; break ;
         }
         return ;
     }
@@ -268,8 +269,8 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
                 {
                     prevNibble[index] |=  bitMask ;
                     message("feedback", address, state) ;
-                    storeEvent( FEEDBACK, address, 1  ) ;                           // for recording
-                    sendFeedbackEvent( address ) ;   
+                    eventHandler.storeEvent( FEEDBACK, address, 1  ) ;                           // for recording
+                    eventHandler.sendFeedbackEvent( address ) ;   
                 }
                 else
                 {
@@ -287,7 +288,7 @@ void setup()
 
     //initIO() ;
 
-    Xnet.setup( Loco128,  2) ;
+    Xnet.setup( Loco128,  2) ;  // NOTE TEST ME WITH lOCO28 ON z21
     debugPort.begin( 9600 ) ;   
     message(F("multimause enhancer booted"),3,5);
 
@@ -298,23 +299,18 @@ void loop()
 {
     // REPEAT_MS( 20 )
     // {
-    //     sensor.debounce() ;
+    //     sensor1.debounce() ;
 
     // } END_REPEAT ;
 
-    // if( sensor.getState() == FALLING )
-    // {
-    //     if( recordingDevice == recording )
-    //     {
-    //         storeEvent( event_feedback, 123, 1 ) ;                              // hardcoded sensor to 123 for testing LINKED TO INPUT PIN D5
-    //     }
-    //     else if( recordingDevice == playing )
-    //     {
-    //         newSensor = 123 ;                                                   // hardcoded sensor to 123 for testing
-    //     }
+    // if( sensor1.getState() == FALLING )
+    // {  
+    //     for( int i = 0 ; i < nChannels)                                                                          // for loop needed to send all sensor input to all eventHandlers
+    //     eventHandler.storeEvent( FEEDBACK, 65000, 1  ) ;                     // internal sensors for recording
+    //     eventHandler.sendFeedbackEvent( 65000 ) ;   
     // }
 
     handlePoints() ;
-    eventHandler() ;                                                            // handles playing program
+    eventHandler.update() ;                                                            // handles playing program
     Xnet.update() ;
 }
