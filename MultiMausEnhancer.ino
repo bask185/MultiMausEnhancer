@@ -8,12 +8,18 @@
 #include <SoftwareSerial.h>
 #include "points.h"
 //#include "shuttle.h"
-#include "event.h"
+#include "src/event.h"
+#include <Servo.h>
 
-SoftwareSerial debugPort(3,4) ;
-Debounce sensor( 5 ) ;
+#define setLed(x,y,z); digitalWrite( greenLedPin, x ) ; digitalWrite( yellowLedPin, y ) ; digitalWrite( redLedPin, z ) ;
 
-#define RS485DIR 2
+Debounce detector1( detector1pin ) ;
+Debounce detector2( detector2pin ) ;
+Debounce play(      playPin ) ;
+Debounce stop(      stopPin ) ;
+Debounce record(    recordPin ) ;
+
+Servo point ;
 
 #define   F0_F4  0x00
 #define   F5_F8  0x01
@@ -26,9 +32,29 @@ Debounce sensor( 5 ) ;
 #define POINT_DELAY( interval ) uint32_t prevTime = millis() ; \
                                 while( millis() - prevTime <= interval ) { Xnet.update(); }
 
+#ifndef DEBUG
 XpressNetMasterClass Xnet ;
-EventHandler eventHandler( 0 ) ; 
+SoftwareSerial debugPort(3,4) ;
+#endif
+
+EventHandler eventHandler( 0, 1024 ) ; 
+// EventHandler eventHandler( 0, i2cAddress of choise ) ; // going to use 4 I2C eeproms and split memory in 8 parts
 // EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+// EventHandler eventHandler( 0, i2cAddress of choise ) ;
+
+
+/* THINGS TODO.
+ * add servo code for motor, and commision 2 potentiometers for positions
+ * add the detectors to transmitt feedback
+ * update eventhandler stuff were needed
+ * add the 2 detectors.
+
+*/
 
 uint8   setSpeed ;
 uint8   knob ;
@@ -51,18 +77,24 @@ volatile unsigned long long oldState ; // 64 bits
 
 void message( String mess, uint16 val1, uint16 val2 )
 {
+#ifdef DEBUG
+    Serial.println( mess ) ;
+#else
     debugPort.print( mess ) ; debugPort.write(' ') ;
     debugPort.print( val1 ) ; debugPort.write(' ') ;
     debugPort.println( val2 ) ;
+#endif
 }
 
 void setPoint( uint16 pointAddress, uint8 state )
 {
     // message(F("Xnet Point set:"), pointAddress, state ) ;                    // works fine
     //setEvent( pointSet ) ;
+#ifndef DEBUG
     Xnet.SetTrntPos( pointAddress, state, 1 ) ;                             // BUG needs to be wrapper function, no acces to Xnet object here
     POINT_DELAY( 20 ) ;
     Xnet.SetTrntPos( pointAddress, state, 0 ) ;
+#endif
 }
 
 
@@ -214,19 +246,22 @@ void notifyXNetPower(uint8_t State)
     //else                    { /*digitalWrite(led,  LOW);*/ }
 }
 
+//void message( String mess, uint16 val1, uint16 val2 );
+
 void notifyEvent( uint8 type, uint16 address, uint8 data )                            // CALL BACK FUNCTION FROM EVENT.CPP
 {
     switch( type )
     {
-        case START:          message(F("player: started"), 0, 0 ) ;                                                               break ; // flash an led?
-        case speedEvent:     message(F("player: setting speed"), address, data ) ; Xnet.setSpeed(      address, Loco128, data ) ; break ; 
-        case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ; Xnet.setFunc0to4(   address,data ) ;           break ;
-        case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ; Xnet.setFunc5to8(   address,data ) ;           break ;
-        case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ; Xnet.setFunc9to12(  address,data ) ;           break ;
-        case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ; Xnet.setFunc13to20( address,data ) ;           break ;
+        case RECORDING:      message(F("player: recording"), 0, 0 ) ; setLed(0,1,0);
+        case START:          message(F("player: started"), 0, 0 ) ;  setLed(1,0,0);                                               break ; // flash an led?
+        case speedEvent:     message(F("player: setting speed"), address, data ) ;  Xnet.setSpeed(      address, Loco128, data ) ;  break ; 
+        case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ;  Xnet.setFunc0to4(   address,data ) ;            break ;
+        case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ;  Xnet.setFunc5to8(   address,data ) ;            break ;
+        case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ;  Xnet.setFunc9to12(  address,data ) ;            break ;
+        case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ;  Xnet.setFunc13to20( address,data ) ;            break ;
         case accessoryEvent: message(F("player: setting point"), address, data ) ;           setPoint( address,data ) ;           break ;
         case FEEDBACK:       message(F("player: feedback"),      address, data ) ;                                                break ;
-        case STOP:           message(F("player: program stopped"),   0, 0 ) ;                                                     break ; // flash an led?
+        case STOP:           message(F("player: program stopped"),   0, 0 ) ;  setLed(0,0,1);                                     break ; // flash an led?
     }
 }
 
@@ -259,7 +294,6 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
             address += 4 ;
         }
         
-
         for( uint8 bitMask = 0x01 ; bitMask < 0x40 ; bitMask <<= 1 )            // check 4 bits
         {
             address ++ ;
@@ -286,31 +320,64 @@ void setup()
 {
     uint16_t eeAddress = 0 ;
 
-    //initIO() ;
-
+    initIO() ;
+#ifndef DEBUG
     Xnet.setup( Loco128,  2) ;  // NOTE TEST ME WITH lOCO28 ON z21
-    debugPort.begin( 9600 ) ;   
+    debugPort.begin( 9600 ) ; 
+#else
+    Serial.begin(115200);
+#endif
     message(F("multimause enhancer booted"),3,5);
-
+    point.attach( servoPin );
     //Xnet.ReqLocoBusy( 99 ) ; 
 }
 
 void loop()
 {
-    // REPEAT_MS( 20 )
-    // {
-    //     sensor1.debounce() ;
+    REPEAT_MS( 500 )
+    {
+        detector1.debounce() ;
+        detector2.debounce() ;
 
-    // } END_REPEAT ;
+    } END_REPEAT ;
+    
+    REPEAT_MS( 20 )
+    {
+        play.debounce() ;
+        stop.debounce() ;
+        record.debounce() ;
+    } END_REPEAT
 
-    // if( sensor1.getState() == FALLING )
-    // {  
-    //     for( int i = 0 ; i < nChannels)                                                                          // for loop needed to send all sensor input to all eventHandlers
-    //     eventHandler.storeEvent( FEEDBACK, 65000, 1  ) ;                     // internal sensors for recording
-    //     eventHandler.sendFeedbackEvent( 65000 ) ;   
-    // }
 
-    handlePoints() ;
-    eventHandler.update() ;                                                            // handles playing program
+    uint8 state = detector1.getState() ;
+    if( state == FALLING || state == RISING )
+    {
+        eventHandler.storeEvent( FEEDBACK, 50000, 1  ) ;  // random address used which cannot exist elsewhere
+        eventHandler.sendFeedbackEvent( 50000 ) ;
+        message("feedback", 50000, state ) ;
+    }
+
+    state = detector2.getState() ;
+    if( state == FALLING || state == RISING )
+    {
+        eventHandler.storeEvent( FEEDBACK, 50001, 1  ) ;  // random address used which cannot exist elsewhere
+        eventHandler.sendFeedbackEvent( 50001 ) ;
+        message("feedback", 50001, state ) ;
+    }
+
+    if(   play.getState() == FALLING ) { message("playing button", 50001, state ) ; eventHandler.startPlaying() ;  } //setLed(1,0,0); ; }
+    if(   stop.getState() == FALLING ) { message("stop button", 50001, state ) ;    eventHandler.stopRecording()  ; eventHandler.stopPlaying() ; }//setLed(0,0,1); }  
+    if( record.getState() == FALLING ) { message("record button", 50001, state ) ;  eventHandler.startRecording() ;}//setLed(0,1,0); }
+    
+
+    // handlePoints() ;
+    eventHandler.update() ;                                                            // handles program
+
+#ifndef DEBUG
     Xnet.update() ;
+#else
+    byte b = Serial.read() ;
+    if( b == 's' ) eventHandler.storeEvent( accessoryEvent, 1, 2 ) ;
+
+#endif
 }

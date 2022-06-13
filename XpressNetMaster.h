@@ -33,6 +33,11 @@
 */
 
 // ensure this library description is only included once
+
+// #define DEBUG
+#ifndef DEBUG
+
+
 #ifndef XpressNetMaster_h
 #define XpressNetMaster_h
 
@@ -279,3 +284,4 @@ class XpressNetMasterClass
 
 #endif
 
+#endif

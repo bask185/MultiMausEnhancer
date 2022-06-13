@@ -1,5 +1,5 @@
 #include "points.h"
-#include "event.h"
+#include "src/event.h"
 #include <EEPROM.h>
 #include "src/stateMachineClass.h"
 
