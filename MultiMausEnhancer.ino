@@ -78,7 +78,7 @@ volatile unsigned long long oldState ; // 64 bits
 void message( String mess, uint16 val1, uint16 val2 )
 {
 #ifdef DEBUG
-    Serial.println( mess ) ;
+    Serial.print( mess ) ; Serial.write(' ');  Serial.print(val1) ; Serial.write(' ');  Serial.println(val2) ;
 #else
     debugPort.print( mess ) ; debugPort.write(' ') ;
     debugPort.print( val1 ) ; debugPort.write(' ') ;
@@ -252,16 +252,23 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
 {
     switch( type )
     {
-        case RECORDING:      message(F("player: recording"), 0, 0 ) ; setLed(0,1,0);
-        case START:          message(F("player: started"), 0, 0 ) ;  setLed(1,0,0);                                               break ; // flash an led?
+        // DEFAULT EVENTS
+        case FEEDBACK:        message(F("player: feedback "),  address, data ) ;           break ;
+        case START:           message(F("start event"),         0, 0 ) ;                   break ; // flash an led?
+        case STOP:            message(F("stop event "),         0, 0 ) ;    setLed(0,0,0); break ; // flash an led?
+        case STOP_RECORDING:  message(F("recording stopped"),   0, 0 ) ;    setLed(0,0,0); break ;
+        case START_RECORDING: message(F("recording started"),   0, 0 ) ;    setLed(0,0,1); break ;
+        case START_PLAYING:   message(F("playing started"),     0, 0 ) ;    setLed(1,0,0); break ;
+        case STOP_PLAYING:    message(F("player stopped"),      0, 0 ) ;    setLed(0,0,0); break ;
+        case FINISHING:       message(F("finishting"),          0, 0 ) ;    setLed(0,1,0); break ;
+
+        // CUSTOM EVENTS
         case speedEvent:     message(F("player: setting speed"), address, data ) ;  Xnet.setSpeed(      address, Loco128, data ) ;  break ; 
         case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ;  Xnet.setFunc0to4(   address,data ) ;            break ;
         case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ;  Xnet.setFunc5to8(   address,data ) ;            break ;
         case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ;  Xnet.setFunc9to12(  address,data ) ;            break ;
         case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ;  Xnet.setFunc13to20( address,data ) ;            break ;
-        case accessoryEvent: message(F("player: setting point"), address, data ) ;           setPoint( address,data ) ;           break ;
-        case FEEDBACK:       message(F("player: feedback"),      address, data ) ;                                                break ;
-        case STOP:           message(F("player: program stopped"),   0, 0 ) ;  setLed(0,0,1);                                     break ; // flash an led?
+        case accessoryEvent: message(F("player: setting point"), address, data ) ;            setPoint( address,data ) ;            break ;
     }
 }
 
@@ -338,15 +345,16 @@ void loop()
     {
         detector1.debounce() ;
         detector2.debounce() ;
-
-    } END_REPEAT ;
+    }
+    END_REPEAT
     
     REPEAT_MS( 20 )
     {
         play.debounce() ;
         stop.debounce() ;
         record.debounce() ;
-    } END_REPEAT
+    }
+    END_REPEAT
 
 
     uint8 state = detector1.getState() ;
@@ -365,9 +373,10 @@ void loop()
         message("feedback", 50001, state ) ;
     }
 
-    if(   play.getState() == FALLING ) { message("playing button", 50001, state ) ; eventHandler.startPlaying() ;  } //setLed(1,0,0); ; }
-    if(   stop.getState() == FALLING ) { message("stop button", 50001, state ) ;    eventHandler.stopRecording()  ; eventHandler.stopPlaying() ; }//setLed(0,0,1); }  
-    if( record.getState() == FALLING ) { message("record button", 50001, state ) ;  eventHandler.startRecording() ;}//setLed(0,1,0); }
+    if(   play.getState() == FALLING ) { message("playing button", 50001, state ) ; eventHandler.startPlaying() ; }
+    if(   stop.getState() == FALLING ) { message("stop button",    50001, state ) ; eventHandler.stopRecording() ; 
+                                                                                    eventHandler.stopPlaying() ; }  
+    if( record.getState() == FALLING ) { message("record button",  50001, state ) ; eventHandler.startRecording() ; }
     
 
     // handlePoints() ;
