@@ -9,7 +9,7 @@
 #include "points.h"
 //#include "shuttle.h"
 #include "src/event.h"
-#include <Servo.h>
+#include "src/ServoSweep.h"
 
 #define setLed(x,y,z); digitalWrite( greenLedPin, x ) ; digitalWrite( yellowLedPin, y ) ; digitalWrite( redLedPin, z ) ;
 
@@ -19,7 +19,7 @@ Debounce play(      playPin ) ;
 Debounce stop(      stopPin ) ;
 Debounce record(    recordPin ) ;
 
-Servo point ;
+ServoSweep point( servoPin1, 85, 95, 20, 1) ; // 85/95 degrees, every 20ms, shift degree, Turn off after reaching end
 
 #define   F0_F4  0x00
 #define   F5_F8  0x01
@@ -103,14 +103,26 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
     if( bitRead(data,3) == 1 )
     { 
         data &= 0x1 ;
-        passPoint( Address | (data<<15) ) ;
+        // passPoint( Address | (data<<15) ) ;
 
         //message(F( "Xnet Point received"), Address, data ) ;
         
-        if(      Address == 997 && data == 0 ) { eventHandler.startPlaying()   ; } // may be replaced to a loco address with functions?
-        else if( Address == 997 && data == 1 ) { eventHandler.stopPlaying()    ; }
-        else if( Address == 998 && data == 0 ) { eventHandler.startRecording() ; }
-        else if( Address == 998 && data == 1 ) { eventHandler.stopRecording()  ; }
+        // if(      Address == 997 && data == 0 ) { eventHandler.startPlaying()   ; } // may be replaced to a loco address with functions?
+        // else if( Address == 997 && data == 1 ) { eventHandler.stopPlaying()    ; }
+        // else if( Address == 998 && data == 0 ) { eventHandler.startRecording() ; }
+        // else if( Address == 998 && data == 1 ) { eventHandler.stopRecording()  ; }
+        if( Address == 1 )                                                      // point 1 or 2, I thought 1?
+        {
+            uint16 sample = analogRead( lowPosPin ) ;
+            sample = map( sample, 0, 1023, 0 , 180 ) ;
+            point.setMin(sample) ;
+            
+            sample = analogRead( highPosPin ) ;
+            sample = map( sample, 0, 1023, 0 , 180 ) ;
+            point.setMax(sample) ;
+            
+            point.setState( data ) ;                                            // physically move servo motor
+        }
         else
         {
             eventHandler.storeEvent( accessoryEvent, Address, data ) ;
@@ -252,23 +264,44 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
 {
     switch( type )
     {
-        // DEFAULT EVENTS
-        case FEEDBACK:        message(F("player: feedback "),  address, data ) ;           break ;
-        case START:           message(F("start event"),         0, 0 ) ;                   break ; // flash an led?
-        case STOP:            message(F("stop event "),         0, 0 ) ;    setLed(0,0,0); break ; // flash an led?
-        case STOP_RECORDING:  message(F("recording stopped"),   0, 0 ) ;    setLed(0,0,0); break ;
-        case START_RECORDING: message(F("recording started"),   0, 0 ) ;    setLed(0,0,1); break ;
-        case START_PLAYING:   message(F("playing started"),     0, 0 ) ;    setLed(1,0,0); break ;
-        case STOP_PLAYING:    message(F("player stopped"),      0, 0 ) ;    setLed(0,0,0); break ;
-        case FINISHING:       message(F("finishting"),          0, 0 ) ;    setLed(0,1,0); break ;
+    // DEFAULT EVENTS
+    case FEEDBACK:        message(F("player: feedback "),  address, data ) ;           break ; // blink?
+    case START:           message(F("start event"),         0, 0 ) ;                   break ;
+    case STOP:            message(F("stop event "),         0, 0 ) ; /*setLed(0,0,0);*/break ;
+    case STOP_RECORDING:  message(F("recording stopped"),   0, 0 ) ;    setLed(0,0,0); break ;
+    case START_RECORDING: message(F("recording started"),   0, 0 ) ;    setLed(0,0,1); break ;
+    case START_PLAYING:   message(F("playing started"),     0, 0 ) ;    setLed(1,0,0); break ;
+    case STOP_PLAYING:    message(F("player stopped"),      0, 0 ) ;    setLed(0,0,0); break ;
+    case FINISHING:       message(F("finishting"),          0, 0 ) ;    setLed(0,1,0); break ;
+    case RESTARTING:      message(F("restarting"),          0, 0 ) ;                   break ;
 
-        // CUSTOM EVENTS
-        case speedEvent:     message(F("player: setting speed"), address, data ) ;  Xnet.setSpeed(      address, Loco128, data ) ;  break ; 
-        case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ;  Xnet.setFunc0to4(   address,data ) ;            break ;
-        case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ;  Xnet.setFunc5to8(   address,data ) ;            break ;
-        case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ;  Xnet.setFunc9to12(  address,data ) ;            break ;
-        case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ;  Xnet.setFunc13to20( address,data ) ;            break ;
-        case accessoryEvent: message(F("player: setting point"), address, data ) ;            setPoint( address,data ) ;            break ;
+    // CUSTOM EVENTS
+    case speedEvent:     message(F("player: setting speed"), address, data ) ;  
+        #ifndef DEBUG   
+            Xnet.setSpeed(      address, Loco128, data ) ;  
+        #endif
+        break ; 
+    case F0_F4Event:     message(F("player: F0-F4"),         address, data ) ;  
+        #ifndef DEBUG   
+            Xnet.setFunc0to4(   address,data ) ;            
+        #endif
+        break ;
+    case F5_F8Event:     message(F("player: F5-F8"),         address, data ) ;  
+        #ifndef DEBUG   
+            Xnet.setFunc5to8(   address,data ) ;            
+        #endif
+        break ;
+    case F9_F12Event:    message(F("player: F9-F12"),        address, data ) ;  
+        #ifndef DEBUG   
+            Xnet.setFunc9to12(  address,data ) ;            
+        #endif
+        break ;
+    case F13_F20Event:   message(F("player: F13-F20"),       address, data ) ;  
+        #ifndef DEBUG   
+            Xnet.setFunc13to20( address,data ) ;            
+        #endif
+        break ;
+    case accessoryEvent: message(F("player: setting point"), address, data ) ;            setPoint( address,data ) ;            break ;
     }
 }
 
@@ -334,9 +367,12 @@ void setup()
 #else
     Serial.begin(115200);
 #endif
-    message(F("multimause enhancer booted"),3,5);
-    point.attach( servoPin );
-    //Xnet.ReqLocoBusy( 99 ) ; 
+    message(F("multimaus enhancer booted"),3,5);
+    point.begin() ;
+    
+    //Xnet.ReqLocoBusy( 99 ) ;
+    point.begin() ;
+
 }
 
 void loop()
@@ -360,7 +396,7 @@ void loop()
     uint8 state = detector1.getState() ;
     if( state == FALLING || state == RISING )
     {
-        eventHandler.storeEvent( FEEDBACK, 50000, 1  ) ;  // random address used which cannot exist elsewhere
+        eventHandler.storeEvent( FEEDBACK, 50000, 1  ) ;
         eventHandler.sendFeedbackEvent( 50000 ) ;
         message("feedback", 50000, state ) ;
     }
@@ -368,19 +404,20 @@ void loop()
     state = detector2.getState() ;
     if( state == FALLING || state == RISING )
     {
-        eventHandler.storeEvent( FEEDBACK, 50001, 1  ) ;  // random address used which cannot exist elsewhere
+        eventHandler.storeEvent( FEEDBACK, 50001, 1  ) ;
         eventHandler.sendFeedbackEvent( 50001 ) ;
         message("feedback", 50001, state ) ;
     }
 
-    if(   play.getState() == FALLING ) { message("playing button", 50001, state ) ; eventHandler.startPlaying() ; }
-    if(   stop.getState() == FALLING ) { message("stop button",    50001, state ) ; eventHandler.stopRecording() ; 
-                                                                                    eventHandler.stopPlaying() ; }  
-    if( record.getState() == FALLING ) { message("record button",  50001, state ) ; eventHandler.startRecording() ; }
+    if(   play.getState() == FALLING ) { message("play button",   1, 1 ) ; eventHandler.startPlaying()   ; }
+    if(   stop.getState() == FALLING ) { message("stop button",   1, 1 ) ; eventHandler.stopRecording()  ; 
+                                                                           eventHandler.stopPlaying()    ; }  
+    if( record.getState() == FALLING ) { message("record button", 1, 1 ) ; eventHandler.startRecording() ; }
     
 
     // handlePoints() ;
-    eventHandler.update() ;                                                            // handles program
+    eventHandler.update() ;                                                     // handles program
+    point.sweep() ;
 
 #ifndef DEBUG
     Xnet.update() ;

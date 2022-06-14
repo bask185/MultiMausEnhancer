@@ -4,7 +4,7 @@ extern void initIO(void) {
 	pinMode(RS485DIR, OUTPUT);
 	pinMode(detector1pin, INPUT_PULLUP);
 	pinMode(detector2pin, INPUT_PULLUP);
-	pinMode(servoPin, OUTPUT);
+	pinMode(servoPin1, OUTPUT);
 	pinMode(playPin, INPUT_PULLUP);
 	pinMode(stopPin, INPUT_PULLUP);
 	pinMode(recordPin, INPUT_PULLUP);

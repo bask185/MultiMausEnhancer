@@ -164,12 +164,13 @@ void EventHandler::update()
             if( recordingDevice == finishing )
             {
                 recordingDevice = idle ;
-                if( notifyEvent ) notifyEvent( STOP, 1, 1 ) ;
+                if( notifyEvent ) notifyEvent( STOP,  1, 1 ) ;
                 return ;
             }
             else
             {
                 recordingDevice = idle ;
+                if( notifyEvent ) notifyEvent( RESTARTING, 1, 1 ) ;
                 startPlaying() ;
                 return ;
             }

@@ -1,7 +1,7 @@
 2	RS485DIR	OUTPUT
 3	detector1pin	INPUT_PULLUP
 4	detector2pin	INPUT_PULLUP
-7	servoPin	OUTPUT
+7	servoPin1	OUTPUT
 8	playPin	INPUT_PULLUP
 9	stopPin	INPUT_PULLUP
 10	recordPin	INPUT_PULLUP

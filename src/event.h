@@ -12,14 +12,15 @@ enum eventModes
 
 enum defaultEvents
 {
-    FEEDBACK = 247, // = 255 - 8 events
-    START,
-    STOP,
+    FEEDBACK = 246, // = 255 - 9 events
+    START, // needed?
+    STOP,  // needed?
     STOP_RECORDING,
     START_RECORDING,
     START_PLAYING,
     STOP_PLAYING,
     FINISHING,
+    RESTARTING,
 } ;
 
 enum eepromTypes
@@ -57,7 +58,7 @@ public:
 private:
     Event       event ;
     Event       getEvent() ;
-    I2cEeprom   i2cEeprom ;
+    //I2cEeprom   i2cEeprom ;
 
     uint32  beginAddress ;
     uint8   i2cAddress ;
