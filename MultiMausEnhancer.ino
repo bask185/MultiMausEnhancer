@@ -6,8 +6,6 @@
 #include "XpressNetMaster.h"
 #include <EEPROM.h> // needs to be removed in the future, preferebly
 #include <SoftwareSerial.h>
-#include "points.h"
-//#include "shuttle.h"
 #include "src/event.h"
 #include "src/ServoSweep.h"
 
@@ -416,7 +414,7 @@ void loop()
     
 
     // handlePoints() ;
-    eventHandler.update() ;                                                     // handles program
+    eventHandler.update() ;                                                     // handles program OBSOLETE in this branch
     point.sweep() ;
 
 #ifndef DEBUG
