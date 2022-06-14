@@ -2,6 +2,11 @@
 #include "event.h"
 
 
+extern void errorNotRecording() ;
+extern void dispEvent( uint8_t, uint16_t, uint8_t ) ;
+extern void flashLED() ;
+
+
 EventHandler::EventHandler( uint32 _beginAddress, uint32 _maxAddress )
 {
     recordingDevice = idle ;
@@ -105,7 +110,10 @@ void EventHandler::resetProgram()
 
 void EventHandler::storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
 {
-    if( recordingDevice != recording ) return ;
+    if( recordingDevice != recording )  return ;
+
+    //dispEvent( _data1, _data2, _data3 ) ;
+    flashLED() ;
 
     Event     localEvent ;
     uint32    currTime = millis() ;
@@ -125,9 +133,9 @@ void EventHandler::storeEvent( uint8 _data1, uint16 _data2, uint8 _data3 )
     //else                                { error = i2cEeprom.put( eeAddress, localEvent ) ; }
     
     //if(notifyI2cErrror)                         notifyI2cErrror( error ) ; gets me error 4 which is kinda annoying, better to turn this one off
-    if( displayStoreMemory )                    displayStoreMemory( eeAddress ) ;
-    if( displayFreeMemory  )                    displayFreeMemory( ( (0x2000 - eeAddress - beginAddress) / sizeof( localEvent ) ) ) ;
-    if( eeAddress == maxAddress && memoryFull ) memoryFull() ;
+    //if( displayStoreMemory )                    displayStoreMemory( eeAddress ) ;
+    //if( displayFreeMemory  )                    displayFreeMemory( ( (0x2000 - eeAddress - beginAddress) / sizeof( localEvent ) ) ) ;
+    //if( eeAddress == maxAddress && memoryFull ) memoryFull() ;
 
     eeAddress += sizeof( localEvent ) ;            // increase EEPROM address for next event ;
 }
@@ -155,7 +163,7 @@ void EventHandler::update()
             return ;
         }
                                        //    8bit         16bit        8bit       // for here and now, data1, is type, data2 is address and data 3 just data.
-        if( notifyEvent ) notifyEvent( event.data1, event.data2, event.data3 ) ;
+        if( notifyEvent && event.data1 != STOP ) notifyEvent( event.data1, event.data2, event.data3 ) ;
 
         prevTime = currTime ;
         

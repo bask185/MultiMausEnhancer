@@ -11,6 +11,13 @@
 
 #define setLed(x,y,z); digitalWrite( greenLedPin, x ) ; digitalWrite( yellowLedPin, y ) ; digitalWrite( redLedPin, z ) ;
 
+void flashLED()
+{
+    digitalWrite( yellowLedPin, HIGH ) ;
+    delay(200) ;
+    digitalWrite( yellowLedPin,  LOW ) ;
+}
+
 Debounce detector1( detector1pin ) ;
 Debounce detector2( detector2pin ) ;
 Debounce play(      playPin ) ;
@@ -32,7 +39,7 @@ ServoSweep point( servoPin1, 85, 95, 20, 1) ; // 85/95 degrees, every 20ms, shif
 
 #ifndef DEBUG
 XpressNetMasterClass Xnet ;
-SoftwareSerial debugPort(3,4) ;
+SoftwareSerial debugPort(5,6) ;
 #endif
 
 EventHandler eventHandler( 0, 1024 ) ; 
@@ -84,8 +91,27 @@ void message( String mess, uint16 val1, uint16 val2 )
 #endif
 }
 
+void errorNotRecording()
+{
+#ifdef DEBUG
+    Serial.println("error not recording");
+#endif   
+}
+
+void dispEvent( uint8_t _da1, uint16_t _da2, uint8_t _da3 ) 
+{
+#ifdef DEBUG
+    Serial.print("stored evend: ");
+    Serial.print(   _da1 ) ;
+    Serial.print(   _da2 ) ;
+    Serial.println( _da3 ) ;
+#endif
+}
+
+
 void setPoint( uint16 pointAddress, uint8 state )
 {
+    PORTB ^= (1<<5);
     // message(F("Xnet Point set:"), pointAddress, state ) ;                    // works fine
     //setEvent( pointSet ) ;
 #ifndef DEBUG
@@ -100,160 +126,24 @@ void notifyXNetTrnt(uint16_t Address, uint8_t data)
 {
     if( bitRead(data,3) == 1 )
     { 
-        data &= 0x1 ;
-        // passPoint( Address | (data<<15) ) ;
-
-        //message(F( "Xnet Point received"), Address, data ) ;
-        
-        // if(      Address == 997 && data == 0 ) { eventHandler.startPlaying()   ; } // may be replaced to a loco address with functions?
-        // else if( Address == 997 && data == 1 ) { eventHandler.stopPlaying()    ; }
-        // else if( Address == 998 && data == 0 ) { eventHandler.startRecording() ; }
-        // else if( Address == 998 && data == 1 ) { eventHandler.stopRecording()  ; }
-        if( Address == 1 )                                                      // point 1 or 2, I thought 1?
-        {
-            uint16 sample = analogRead( lowPosPin ) ;
-            sample = map( sample, 0, 1023, 0 , 180 ) ;
-            point.setMin(sample) ;
-            
-            sample = analogRead( highPosPin ) ;
-            sample = map( sample, 0, 1023, 0 , 180 ) ;
-            point.setMax(sample) ;
-            
-            point.setState( data ) ;                                            // physically move servo motor
-        }
-        else
-        {
-            eventHandler.storeEvent( accessoryEvent, Address, data ) ;
-        }
+        data &= 0x1 ;  
+        //eventHandler.storeEvent( accessoryEvent, Address, data ) ;
+        PORTB ^= (1<<5);
     }   
 }
 
-void notifyXNetLocoDrive28( uint16_t Address, uint8_t Speed )                   
-{
-    eventHandler.storeEvent( speedEvent, Address, Speed ) ;  /// NOTE, z21 used this, DR5000 forces everything to 128?
-
-    static uint8 state = 0 , prevKnob = 0xFF ;
-    int8_t speed ;
-
-    speed = Speed & 0x7F ;
-
-    if( speed > 0 ) speed -- ;
-    if( Speed & 0x80 ) speed = -speed ;
-   
-    if(         speed <  -20              ) knob = 4 ;
-    else if(    speed >= -5 && speed < -5 ) knob = 3 ;
-    else if(    speed >  -5 && speed <  5 ) knob = 2 ;
-    else if(    speed <=  5 && speed >  5 ) knob = 1 ;
-    else if(    speed >   20              ) knob = 0 ;
-
-    if( knob != prevKnob )
-    {
-        prevKnob = knob ;
-        message(F("knob 28 "), knob, Speed ) ;
-    }
-}
-
-void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed )                   
-{
-    //return ; // DELETE ME
-
-    eventHandler.storeEvent( speedEvent, Address, Speed ) ;
-
-    static uint8 state = 0 , prevKnob = 0xFF ;
-    int8_t speed ;
-
-    speed = Speed & 0x7F ;
-
-    if( speed > 0 ) speed -- ;
-    if( Speed & 0x80 ) speed = -speed ;
-   
-    if(         speed <  -100                ) knob = 4 ;
-    else if(    speed >= -100 && speed < -20 ) knob = 3 ;
-    else if(    speed >   -20 && speed <  20 ) knob = 2 ;
-    else if(    speed <=  100 && speed >  20 ) knob = 1 ;
-    else if(    speed >   100                ) knob = 0 ;
-
-    if( knob != prevKnob )
-    {
-        prevKnob = knob ;
-        message(F("knob 128"), knob, Speed ) ;
-    }
-}
-
-
-
-void functionPressed ( uint16 Address, uint8 func, uint8 bank )                 // bank is verivied, address is verivied, Address is verivied
-{
-    if( Address == 6 && bank == F0_F4 )
-    {
-        if( func & 0b0001 ) eventHandler.startPlaying() ;
-        if( func & 0b0010 ) eventHandler.stopPlaying() ;
-        if( func & 0b0100 ) eventHandler.startRecording() ;
-        if( func & 0b1000 ) eventHandler.stopRecording() ;
-        return ;
-    }
-
-    if( Address != 1 )
-    {
-        switch( bank )
-        {
-        case    F0_F4: eventHandler.storeEvent(   F0_F4Event, Address, func ) ; break ;
-        case    F5_F8: eventHandler.storeEvent(   F5_F8Event, Address, func ) ; break ;
-        case   F9_F12: eventHandler.storeEvent(  F9_F12Event, Address, func ) ; break ;
-        case  F13_F20: eventHandler.storeEvent( F13_F20Event, Address, func ) ; break ;
-        }
-        return ;
-    }
-    
-    // following code is only for address 1
-
-    volatile static uint8 prevState[4];
-    volatile uint8  fKey ;
-    volatile uint16 maskMax ;
-
-    switch( bank )
-    {
-    case   F0_F4 : fKey =  0 ; maskMax =  0x20 ; break ;
-    case   F5_F8 : fKey =  4 ; maskMax =  0x10 ; break ;
-    case  F9_F12 : fKey =  8 ; maskMax =  0x10 ; break ;
-    case F13_F20 : fKey = 12 ; maskMax = 0x100 ; break ;
-    }
-
-    for( uint8 bitMask = 0x01 ; bitMask < maskMax ; bitMask <<= 1 )
-    {
-        fKey ++ ;
-        if( (func & bitMask) != (prevState[bank] & bitMask ) )
-        {
-            if( func & bitMask ) { prevState[bank] |=  bitMask ; }
-            else                 { prevState[bank] &= ~bitMask ; }
-
-            if( fKey == 5 && bank == F0_F4 ) fKey = 0 ;                         // F0 is on the 5th bit
-
-            oldState ^= (1 << fKey );                                           // toggle previous state SK: HOW CAN THIS WORK?
-            bool state = oldState >> fKey ;                                     // get state 
-
-            uint8 pointNumber = fKey += ( knob * 10 ) ;                         // 5 groups
-
-            message(F("point set:"), pointNumber, state ) ;
-            //message("Fkey & bank", fKey, bank ) ;
-
-            setPoint( pointNumber, state ) ;
-            return ;
-        }
-    }
-}
-
-void notifyXNetLocoFunc1( uint16_t Address, uint8_t Func1 ) { functionPressed( Address, Func1,   F0_F4 ) ; } //              F0  F4  F3  F2  F1
-void notifyXNetLocoFunc2( uint16_t Address, uint8_t Func2 ) { functionPressed( Address, Func2,   F5_F8 ) ; } //                  F8  F7  F6  F5
-void notifyXNetLocoFunc3( uint16_t Address, uint8_t Func3 ) { functionPressed( Address, Func3,  F9_F12 ) ; } //                 F12 F11 F10  F9
-void notifyXNetLocoFunc4( uint16_t Address, uint8_t Func4 ) { functionPressed( Address, Func4, F13_F20 ) ; } // F20 F19 F18 F17 F16 F15 F14 F13
-
+void notifyXNetLocoDrive28(  uint16_t Address, uint8_t Speed ) { PORTB ^= (1<<5); /*eventHandler.storeEvent(   speedEvent, Address, Speed ) ;*/ } /// NOTE, z21 used this, DR5000 forces everything to 128?
+void notifyXNetLocoDrive128( uint16_t Address, uint8_t Speed ) { PORTB ^= (1<<4); /*eventHandler.storeEvent(   speedEvent, Address, Speed ) ;*/ }                  
+void notifyXNetLocoFunc1(    uint16_t Address, uint8_t Func1 ) { PORTB ^= (1<<5); /*eventHandler.storeEvent(   F0_F4Event, Address, Func1 ) ;*/ } //              F0  F4  F3  F2  F1
+void notifyXNetLocoFunc2(    uint16_t Address, uint8_t Func2 ) { PORTB ^= (1<<5); /*eventHandler.storeEvent(   F5_F8Event, Address, Func2 ) ;*/ } //                  F8  F7  F6  F5
+void notifyXNetLocoFunc3(    uint16_t Address, uint8_t Func3 ) { PORTB ^= (1<<5); /*eventHandler.storeEvent(  F9_F12Event, Address, Func3 ) ;*/ } //                 F12 F11 F10  F9
+void notifyXNetLocoFunc4(    uint16_t Address, uint8_t Func4 ) { PORTB ^= (1<<5); /*eventHandler.storeEvent( F13_F20Event, Address, Func4 ) ;*/ } // F20 F19 F18 F17 F16 F15 F14 F13
 
 void notifyXNetPower(uint8_t State)
 {
     message(F("POWER"), State , 0xFF ) ;
-    //if( State == csNormal ) { /*digitalWrite(led, HIGH);*/ }
-    //else                    { /*digitalWrite(led,  LOW);*/ }
+    if( State == csNormal ) { setLed(1,0,1) ; }
+    else                    { setLed(0,0,0) ; }
 }
 
 //void message( String mess, uint16 val1, uint16 val2 );
@@ -265,7 +155,7 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
     // DEFAULT EVENTS
     case FEEDBACK:        message(F("player: feedback "),  address, data ) ;           break ; // blink?
     case START:           message(F("start event"),         0, 0 ) ;                   break ;
-    case STOP:            message(F("stop event "),         0, 0 ) ; /*setLed(0,0,0);*/break ;
+    case STOP:            message(F("stop event "),         0, 0 ) ;    setLed(0,0,0); break ;
     case STOP_RECORDING:  message(F("recording stopped"),   0, 0 ) ;    setLed(0,0,0); break ;
     case START_RECORDING: message(F("recording started"),   0, 0 ) ;    setLed(0,0,1); break ;
     case START_PLAYING:   message(F("playing started"),     0, 0 ) ;    setLed(1,0,0); break ;
@@ -299,7 +189,7 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
             Xnet.setFunc13to20( address,data ) ;            
         #endif
         break ;
-    case accessoryEvent: message(F("player: setting point"), address, data ) ;            setPoint( address,data ) ;            break ;
+    case accessoryEvent: message(F("player: setting point"), address, data ) ;  /* setPoint( address,data ) ; */           break ;
     }
 }
 
@@ -317,6 +207,7 @@ void notifyEvent( uint8 type, uint16 address, uint8 data )                      
 //  N=0 is the lower nibble, N=1 the upper nibble.
 void notifyXNetFeedback( uint16_t address, uint8_t state )                      // Xnet knows 127 feedback module addresses with 8 bits per address
 {    
+    /*
     if( state & 0b01000000 )                                                    // ITT = 010 for feedback modules
     {
         address >>= 2 ;
@@ -351,6 +242,7 @@ void notifyXNetFeedback( uint16_t address, uint8_t state )                      
             }
         }
     }
+    */
 }
 
 
@@ -360,21 +252,22 @@ void setup()
 
     initIO() ;
 #ifndef DEBUG
-    Xnet.setup( Loco128,  2) ;  // NOTE TEST ME WITH lOCO28 ON z21
+    Xnet.setup( Loco28,  2) ;  // NOTE TEST ME WITH lOCO28 ON z21
     debugPort.begin( 9600 ) ; 
 #else
     Serial.begin(115200);
 #endif
     message(F("multimaus enhancer booted"),3,5);
-    point.begin() ;
-    
+   
     //Xnet.ReqLocoBusy( 99 ) ;
-    point.begin() ;
-
+    //point.begin() ;
 }
+
+
 
 void loop()
 {
+ /*   
     REPEAT_MS( 500 )
     {
         detector1.debounce() ;
@@ -382,6 +275,9 @@ void loop()
     }
     END_REPEAT
     
+#ifndef DEBUG
+    Xnet.update() ;
+#endif
     REPEAT_MS( 20 )
     {
         play.debounce() ;
@@ -390,7 +286,9 @@ void loop()
     }
     END_REPEAT
 
-
+#ifndef DEBUG
+    Xnet.update() ;
+#endif
     uint8 state = detector1.getState() ;
     if( state == FALLING || state == RISING )
     {
@@ -399,6 +297,9 @@ void loop()
         message("feedback", 50000, state ) ;
     }
 
+#ifndef DEBUG
+    Xnet.update() ;
+#endif
     state = detector2.getState() ;
     if( state == FALLING || state == RISING )
     {
@@ -407,21 +308,25 @@ void loop()
         message("feedback", 50001, state ) ;
     }
 
+#ifndef DEBUG
+    Xnet.update() ;
+#endif
     if(   play.getState() == FALLING ) { message("play button",   1, 1 ) ; eventHandler.startPlaying()   ; }
     if(   stop.getState() == FALLING ) { message("stop button",   1, 1 ) ; eventHandler.stopRecording()  ; 
                                                                            eventHandler.stopPlaying()    ; }  
     if( record.getState() == FALLING ) { message("record button", 1, 1 ) ; eventHandler.startRecording() ; }
     
-
+*/
     // handlePoints() ;
-    eventHandler.update() ;                                                     // handles program OBSOLETE in this branch
-    point.sweep() ;
+    //eventHandler.update() ;                                                     // handles program OBSOLETE in this branch
+    //point.sweep() ;
 
 #ifndef DEBUG
     Xnet.update() ;
 #else
     byte b = Serial.read() ;
-    if( b == 's' ) eventHandler.storeEvent( accessoryEvent, 1, 2 ) ;
+    if( b == 's' ) eventHandler.storeEvent( accessoryEvent, 10, 0 ) ;
+    if( b == 'r' ) eventHandler.storeEvent( accessoryEvent, 10, 1 ) ;
 
 #endif
 }
